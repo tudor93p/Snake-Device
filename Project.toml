@@ -5,5 +5,7 @@ version = "0.1.0"
 
 [deps]
 Constants = "26e1ccdb-dc7d-4967-a216-0e9bd72dc499"
+Hamiltonian = "fee9d248-3f83-4f40-8191-96f663df2bc7"
 Helpers = "fd2d3303-ab2f-4175-b0e0-24add640a121"
+Lattice = "58283833-ebef-4145-b08a-24dbce60617d"
 myLibs = "0cc41259-d48e-4a81-8a6d-ec7e330e4bca"
