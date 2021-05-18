@@ -4,7 +4,7 @@ module Device
 #using Constants 
 
 
-import Lattice, Hamiltonian 
+#import Lattice, Hamiltonian 
 
 
 
