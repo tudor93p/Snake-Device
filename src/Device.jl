@@ -1,24 +1,13 @@
 module Device
 #############################################################################
 
-#using Constants 
-
-
-#import Lattice, Hamiltonian 
 
 
 
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
+include("Hamilt_Diagonaliz.jl")
 
 
-
-
-#include("Calculations.jl")
+include("GreensFcts.jl")
 
 
 
@@ -35,20 +24,6 @@ module Device
 
 
 
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-
-#usedkeys = together(Lattice.usedkeys, Hamiltonian.usedkeys)
-#
-#
-#include("ParamFlow.jl")
-#
-#
-#include("Calculations.jl")
 
 
 

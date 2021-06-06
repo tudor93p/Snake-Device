@@ -1,96 +1,35 @@
-using Revise 
+using Revise, Test 
 
-#using Helpers.Hamiltonian 
-import Helpers 
-
-import Device,Lattice,Hamiltonian, LayeredLattice
-
-P = Dict(:length=>10,:width=>7, :Barrier_height=>1.0,:SCpx_magnitude=>0.4,:SCDW_position=>0.3,)
+P = Dict(:length=>10,:width=>7, :Barrier_height=>1.0,:SCpx_magnitude=>0.4,:SCDW_position=>0.3,) 
+P = Dict(:length=>10,:width=>7, :Barrier_height=>1.0,:SCpx_magnitude=>0.4,:SCDW_position=>0.3,:delta=>0.002,:AtomToLayer=>"forced")
 
 
-@show Lattice.dist_to_dw(P)([1,2])
+input_dict = Dict(:allparams=>(
+										length = [10,20],
+									 	width = [7],
+										Barrier_height = [0,0.5],
+										SCpx_magnitude = [0.6],
+										),
 
-L = Lattice.Latt(P) 
+									 :digits=>(
+											length = (3, 0),
 
-@show L 
+											Barrier_height = (1,3),
 
-hampar = Hamiltonian.HParam(P)
+											SCpx_magnitude = (1,3),
+
+											delta = (1,3),
+										)	
+									
+									)
 
 
-for x in propertynames(hampar) 
-
-	println(x,"\t",get(hampar,x,0))
-
-end 
-
+#include("h.jl")
 
 println()
-println()
-
-##d = Device.Calculations.Hamilt_Diagonaliz
-#
-
-
-
-
-
-@show Hamiltonian.get_BlochHamilt(P, L)()
-
-println(Dict(:length=>2,:width=>1,:SCpx_magnitude=>0.2) |> P-> Hamiltonian.get_BlochHamilt(P, Lattice.Latt(P))())
-
-
 println() 
-println()  
 
-
-
-
-
-
-Hopping = Hamiltonian.get_Hopping(P)
-
-
-LAR = LayeredLattice.LayerAtomRels(P)
-
-#LAR, Slicer, LeadR, VL  = 
-NG4 = LayeredLattice.NewGeometry(P; Hopping...) 
-
-@show length(NG4) 
-
-
-
-#LAR, LeadR, VL  =
-NG3 = LayeredLattice.NewGeometry(P)
-
-@show length(NG3) 
-
-
-Obs = Helpers.ObservableNames.construct_ObsNames("DOS","LocalDOS")
-
-fname(x="") = string("test/savefile/",x)
-
-result = Helpers.GF.ComputeObservables_Decimation(Obs, fname, 
-																									Hopping, NG4...; 
-																				 delta=0.002)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-println() 
-println() 
+include("gf.jl")
 
 
 
