@@ -29,9 +29,9 @@ input_dict = Dict(:allparams=>(
 println()
 println() 
 
-include("gf.jl")
+#include("gf.jl")
 
-
+include("plot.jl")
 
 
 
