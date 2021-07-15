@@ -9,6 +9,7 @@ input_dict = Dict(:allparams=>(
 									 	width = [7],
 										Barrier_height = [0,0.5],
 										SCpx_magnitude = [0.6],
+										delta = [0.003],
 										),
 
 									 :digits=>(
