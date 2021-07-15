@@ -5,7 +5,7 @@ import myLibs: ComputeTasks
 
 import Helpers 
 
-import Helpers.myPlots
+#import Helpers.myPlots
 
 using Helpers.myPlots: PlotTask 
 
@@ -15,6 +15,7 @@ using Constants: ENERGIES
 
 import ...GreensFcts  
 
+import LayeredLattice
 
 #===========================================================================#
 #
@@ -39,17 +40,21 @@ end
 
 
 
-
 #===========================================================================#
 #
-#
+function LocalObservables(;observables, kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
+	pt0 = Observables(;observables=observables, kwargs...)
 
 
+	return PlotTask((getproperty(pt0, k) for k in [:name, :get_plotparams, :get_paramcombs, :files_exist, :get_data])...,
+									Helpers.myPlots.init_localobs(observables),
+									Helpers.myPlots.plot_localobs(pt0.get_data, LayeredLattice)...)
 
 
+end
 
 
 

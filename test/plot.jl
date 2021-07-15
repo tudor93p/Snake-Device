@@ -40,8 +40,21 @@ id2 = merge(input_dict, Dict(
 
 
 
-task = Device.TasksPlots.Observables(;id2...)
+#@show id2[:allparams]
 
+
+merge!(merge, id2, input_GF)
+
+#@show id2[:allparams]
+
+
+tasks = [f(;id2...) for f in [Device.TasksPlots.Observables,
+															Device.TasksPlots.LocalObservables]
+				 ]
+
+task = tasks[1] 
+
+P = task.get_paramcombs()[1][1]
 
 @show task.files_exist(P)
 
@@ -49,7 +62,7 @@ foreach(println,task.get_paramcombs())
 
 @show task.get_plotparams(P)
 
-task.get_data(P)
+#task.get_data(P)
 
 @show task.pyplot_script
 
@@ -71,10 +84,10 @@ ComputeTasks.get_data_one(task, mute=false)
 ComputeTasks.get_plot_one(task)
 
 
-ComputeTasks.get_data_all(task, check_data=true, mute=false)
+#ComputeTasks.get_data_all(task, check_data=true, mute=false)
 
 
-Helpers.myPlots.plot([task])#; insets=insets)
+Helpers.myPlots.plot(tasks)#; insets=insets)
 
 
 

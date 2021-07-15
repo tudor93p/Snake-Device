@@ -4,12 +4,23 @@ P = Dict(:length=>10,:width=>7, :Barrier_height=>1.0,:SCpx_magnitude=>0.4,:SCDW_
 P = Dict(:length=>10,:width=>7, :Barrier_height=>1.0,:SCpx_magnitude=>0.4,:SCDW_position=>0.3,:delta=>0.002,:AtomToLayer=>"forced")
 
 
+input_GF =  Dict(:allparams=>(
+
+										delta = [0.07], 
+										), 
+
+									 :digits=>(
+											delta = (1,3),
+										)	
+									
+									)
+
+
 input_dict = Dict(:allparams=>(
 										length = [10,20],
-									 	width = [7],
+									 	width = [8],
 										Barrier_height = [0,0.5],
 										SCpx_magnitude = [0.6],
-										delta = [0.003],
 										),
 
 									 :digits=>(
@@ -19,7 +30,6 @@ input_dict = Dict(:allparams=>(
 
 											SCpx_magnitude = (1,3),
 
-											delta = (1,3),
 										)	
 									
 									)
