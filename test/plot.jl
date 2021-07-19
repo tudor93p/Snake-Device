@@ -24,8 +24,8 @@ import myLibs: ComputeTasks
 
 P = Dict(:length=>10,:width=>7, :Barrier_height=>1.0,:SCpx_magnitude=>0.4,:SCDW_position=>0.3,:delta=>0.002,:AtomToLayer=>"forced")
 
-
-id2 = merge(input_dict, Dict(
+id2 = Helpers.hParameters.merge_input_dicts(input_dict, input_GF,
+										 Dict(
 									 :observables => Helpers.ObservableNames.construct_ObsNames("DOS","LocalDOS"),
 	
 									 :constrained_params => [ 
@@ -37,15 +37,6 @@ id2 = merge(input_dict, Dict(
 
 									)
 					 )
-
-
-
-#@show id2[:allparams]
-
-
-merge!(merge, id2, input_GF)
-
-#@show id2[:allparams]
 
 
 tasks = [f(;id2...) for f in [Device.TasksPlots.Observables,

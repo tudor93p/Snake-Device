@@ -2,9 +2,13 @@ module GreensFcts
 #############################################################################
 
 
-import Helpers, Hamiltonian, LayeredLattice
+import myLibs: Parameters  
 
-import myLibs: Parameters 
+
+import Helpers  
+
+import ..Hamiltonian, ..LayeredLattice
+
 
 #===========================================================================#
 #
@@ -26,30 +30,7 @@ Dependencies = [ LayeredLattice, Hamiltonian, Helpers.GF ]
 
 
 
-function get_target(target::Nothing=nothing; observables, kwargs...
-									 )::Vector{String} 
-	
-	observables 
-
-end 
-
-
-function get_target(target::AbstractString; kwargs...)::Vector{String}
-
-	get_target([target]; kwargs...)
-
-end 
-
-
-
-function get_target(target::AbstractVector{<:AbstractString}; kwargs...
-										)::Vector{String}
-
-	intersect(get_target(;kwargs...), target)
-
-end 
-	
-	
+get_target = Helpers.ObservableNames.f_get_target(:observables)	
 
 
 

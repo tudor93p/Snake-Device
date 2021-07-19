@@ -1,7 +1,15 @@
 #using Helpers.Hamiltonian 
 import Helpers 
 
-import Device,Lattice,Hamiltonian, LayeredLattice
+
+using Device 
+
+#import Lattice,Hamiltonian
+
+#, LayeredLattice 
+
+
+
 using Helpers.Calculations: Calculation
 
 

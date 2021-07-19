@@ -1,4 +1,6 @@
-import Device, Helpers, LayeredLattice
+import Device, Helpers
+
+using Device: LayeredLattice
 
 import myLibs: Parameters
 

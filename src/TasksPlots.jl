@@ -15,7 +15,7 @@ using Constants: ENERGIES
 
 import ...GreensFcts  
 
-import LayeredLattice
+import ..LayeredLattice
 
 #===========================================================================#
 #
