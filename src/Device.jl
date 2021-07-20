@@ -1,13 +1,16 @@
 module Device
 #############################################################################
 
-include("./Hamiltonian/src/Hamiltonian.jl")
+using Constants: FN, PATH_DEVICE
 
-include("./LayeredLattice/src/LayeredLattice.jl")
+
+include(FN(PATH_DEVICE, "Hamiltonian"))
+include(FN(PATH_DEVICE, "LayeredLattice"))
+
 
 using .LayeredLattice: Lattice
-
 #using .Hamiltonian: Lattice 
+
 
 export LayeredLattice, Lattice, Hamiltonian
 
@@ -15,9 +18,7 @@ export LayeredLattice, Lattice, Hamiltonian
 
 include("Hamilt_Diagonaliz.jl")
 
-
 include("GreensFcts.jl")
-
 
 include("TasksPlots.jl")
 
