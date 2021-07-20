@@ -1,9 +1,9 @@
 module Device
 #############################################################################
 
-include("Hamiltonian/src/Hamiltonian.jl")
+include("./Hamiltonian/src/Hamiltonian.jl")
 
-include("LayeredLattice/src/LayeredLattice.jl")
+include("./LayeredLattice/src/LayeredLattice.jl")
 
 using .LayeredLattice: Lattice
 
