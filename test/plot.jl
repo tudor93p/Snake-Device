@@ -2,77 +2,53 @@ import Device
 import Helpers 
 import Helpers.ObservableNames
 #using Helpers.Calculations: Calculation
-import myLibs: ComputeTasks
-
-#spectrum = Calculation(Device.Hamilt_Diagonaliz, input_dict).Compute(P) 
-#
-#@show spectrum["Energy"][10]
-#@show size(spectrum["Energy"])
-
-
-
-#tasks = [
-#				 Tasks.Device_Observables,
-#				 ]
-#
-#
-#
-#
-#Tasks.Generic.plot(tasks)
-
+import myLibs: ComputeTasks, Parameters
 
 
 P = Dict(:length=>10,:width=>7, :Barrier_height=>1.0,:SCpx_magnitude=>0.4,:SCDW_position=>0.3,:delta=>0.002,:AtomToLayer=>"forced")
 
-id2 = Helpers.hParameters.merge_input_dicts(input_dict, input_GF,
-										 Dict(
-									 :observables => Helpers.ObservableNames.construct_ObsNames("DOS","LocalDOS"),
-	
-									 :constrained_params => [ 
-													(l,p) -> (div(p[:length],2), p[:SCpx_magnitude], ),
+id2 = Helpers.hParameters.merge_input_dicts(input_Device, input_GF)
 
-													(:width, :SCpy_magnitude, ),
+PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, id2)
 
-													],
+#@show rand(Parameters.get_paramcombs(PF))[1]
 
-									)
-					 )
-
-
-tasks = [f(;id2...) for f in [Device.TasksPlots.Observables,
+tasks = [f(;id2...) for f in [Device.TasksPlots.HParam,
+															Device.TasksPlots.Latt,
+															Device.TasksPlots.Observables,
 															Device.TasksPlots.LocalObservables]
 				 ]
 
-task = tasks[1] 
+task = tasks[3]
 
 P = task.get_paramcombs()[1][1]
 
-@show task.files_exist(P)
+#@show task.files_exist(P)
 
-foreach(println,task.get_paramcombs())
+#foreach(println,task.get_paramcombs())
 
-@show task.get_plotparams(P)
+#@show task.get_plotparams(P)
 
 #task.get_data(P)
 
-@show task.pyplot_script
+#@show task.pyplot_script
 
 
 println()
 
 
 
-ComputeTasks.missing_data(task, show_missing=true)#false) 
+#ComputeTasks.missing_data(task, show_missing=false)#true)#false) 
 
 
-ComputeTasks.existing_data(task, show_existing=true)
+#ComputeTasks.existing_data(task, show_existing=false)#true)
 
 
-ComputeTasks.get_data_one(task, mute=false)
+#ComputeTasks.get_data_one(task, mute=false)
 
 
 
-ComputeTasks.get_plot_one(task)
+#ComputeTasks.get_plot_one(task)
 
 
 #ComputeTasks.get_data_all(task, check_data=true, mute=false)

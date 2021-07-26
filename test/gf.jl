@@ -9,6 +9,9 @@ using Helpers.Calculations: Calculation
 usedkeys = [:length, :width, :SCpx_magnitude]
 
 
+input_dict = Helpers.hParameters.merge_input_dicts(input_Device, input_GF)
+
+
 PF = Helpers.hParameters.ParamFlow(1, usedkeys, input_dict)
 
 
@@ -16,15 +19,18 @@ PF = Helpers.hParameters.ParamFlow(1, usedkeys, input_dict)
 
 @show PF.allparams()
 
+@show P PF.get_fname(P)()
+
+println()
+
+
+PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, input_dict)
+
+
+P = rand(Parameters.get_paramcombs(PF))[1]
+
+@show P 
 @show PF.get_fname(P)()
-
-FN = Helpers.hParameters.FilenameGenerator(usedkeys, input_dict)
-
-
-
-
-@show Helpers.hParameters.ParamFlow(Device.GreensFcts, input_dict).get_fname(P)()
-
 
 Calculation(LayeredLattice, input_dict).Compute(P)
 
@@ -47,80 +53,25 @@ for (k,v) in  C.Compute(P)
 end 
 
 
+println()
 
 
 
+PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, input_dict)
 
 
+@show PF.allparams()
 
+println()
 
+for item in Parameters.get_paramcombs(PF)
 
+	@show item[1]
 
- 
+	println()
+end  
 
-
-
-
-
-
-
-
- 
-
-
-
-
-
-
-
-
- 
-
-
-
-
-
-
-
-
- 
-
-
-
-
-
-
-
-
- 
-
-
-
-
-
-
-
-
- 
-
-
-
-
-
-
-
-
- 
-
-
-
-
-
-
-
-
- 
-
+println()
 
 
 

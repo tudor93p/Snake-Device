@@ -3,7 +3,7 @@ module GreensFcts
 
 
 import myLibs: Parameters  
-
+using myLibs.Parameters: UODict
 
 import Helpers  
 
@@ -34,8 +34,8 @@ get_target = Helpers.ObservableNames.f_get_target(:observables)
 
 
 
-function Compute(dev_params::AbstractDict; get_fname::Function, kwargs...
-								)::AbstractDict
+function Compute(dev_params::UODict; get_fname::Function, kwargs...
+								)::Dict
 
 	Hopping = Hamiltonian.get_Hopping(dev_params)
 
@@ -52,7 +52,7 @@ function Compute(dev_params::AbstractDict; get_fname::Function, kwargs...
 end 
 
 
-function FoundFiles(dev_params::AbstractDict; target=nothing,
+function FoundFiles(dev_params::UODict; target=nothing,
 										get_fname::Function, kwargs...
 									 )::Bool
 
@@ -62,9 +62,11 @@ function FoundFiles(dev_params::AbstractDict; target=nothing,
 end
 
 
-function Read(dev_params::AbstractDict; target=nothing,
+function Read(dev_params::UODict; target=nothing,
 							get_fname::Function, kwargs...
-						 )::AbstractDict 
+						 )::Dict 
+
+	@show get_fname(dev_params)("DOS")
 
 	Helpers.GF.ReadObservables(get_fname(dev_params), 
 														 get_target(target; kwargs...))

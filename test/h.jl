@@ -1,14 +1,8 @@
 #using Helpers.Hamiltonian 
 import Helpers 
-
+import myLibs:Parameters
 
 using Device 
-
-#import Lattice,Hamiltonian
-
-#, LayeredLattice 
-
-
 
 using Helpers.Calculations: Calculation
 
@@ -73,7 +67,7 @@ NG3 = LayeredLattice.NewGeometry(P)
 
 
 
-spectrum = Calculation(Device.Hamilt_Diagonaliz, input_dict).Compute(P) 
+spectrum = Calculation(Device.Hamilt_Diagonaliz, input_Device).Compute(P) 
 
 
 @show spectrum["Energy"][10]
@@ -93,7 +87,21 @@ println()
 
 
 
+PF = Helpers.hParameters.ParamFlow(Device.Hamilt_Diagonaliz, input_Device)
 
+
+@show PF.allparams()
+
+println()
+
+for item in Parameters.get_paramcombs(PF)
+
+	@show item[1]
+
+	println()
+end  
+
+println()
 
 
 

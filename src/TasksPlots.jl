@@ -5,8 +5,6 @@ import myLibs: ComputeTasks
 
 import Helpers 
 
-#import Helpers.myPlots
-
 using Helpers.myPlots: PlotTask 
 
 using Helpers.Calculations: Calculation  
@@ -16,6 +14,13 @@ using Constants: ENERGIES
 import ...GreensFcts  
 
 import ..LayeredLattice
+
+
+using ..Hamiltonian.TasksPlots 
+
+using ..Lattice.TasksPlots
+
+#using ..LayeredLattice.TasksPlots
 
 #===========================================================================#
 #
