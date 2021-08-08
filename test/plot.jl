@@ -14,14 +14,16 @@ PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, id2)
 #@show rand(Parameters.get_paramcombs(PF))[1]
 
 tasks = [f(;id2...) for f in [Device.TasksPlots.HParam,
-															Device.TasksPlots.Latt,
+#															Device.TasksPlots.Latt,
+															Device.TasksPlots.LocalObservables,
 															Device.TasksPlots.Observables,
-															Device.TasksPlots.LocalObservables]
+															Device.TasksPlots.Spectrum,
+															]
 				 ]
 
-task = tasks[3]
+#task = tasks[3]
 
-P = task.get_paramcombs()[1][1]
+#P = task.get_paramcombs()[1][1]
 
 #@show task.files_exist(P)
 
@@ -48,7 +50,7 @@ println()
 
 
 
-#ComputeTasks.get_plot_one(task)
+ComputeTasks.get_plot_one.(tasks)
 
 
 #ComputeTasks.get_data_all(task, check_data=true, mute=false)

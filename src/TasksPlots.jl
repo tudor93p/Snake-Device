@@ -1,44 +1,37 @@
 module TasksPlots
 #############################################################################
 
-import myLibs: ComputeTasks 
+import Helpers  
 
-import Helpers 
-
-using Helpers.myPlots: PlotTask 
-
+using myLibs.ComputeTasks: CompTask  
 using Helpers.Calculations: Calculation  
+using Helpers.myPlots: PlotTask 
 
 using Constants: ENERGIES
 
-import ...GreensFcts  
 
-import ..LayeredLattice
+import ..LayeredLattice, ..GreensFcts, ..Hamilt_Diagonaliz
 
-
-using ..Hamiltonian.TasksPlots 
-
-using ..Lattice.TasksPlots
+using ..Lattice.TasksPlots, ..Hamiltonian.TasksPlots
 
 #using ..LayeredLattice.TasksPlots
 
 #===========================================================================#
 #
-function Observables(;constrained_params, observables, kwargs...)::PlotTask
+function Observables(; observables, kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
-	C = Calculation(GreensFcts; observables=observables, kwargs...)
 
-	task = ComputeTasks.init_task(C; constrained_params=[1=>constrained_params])
+	task = CompTask(Calculation(GreensFcts; observables=observables, kwargs...))
+
+									#constrained_params=[1=>constrained_params])
 														
 	init_sliders = [Helpers.myPlots.init_obs(observables),
 									Helpers.myPlots.init_enlim(ENERGIES)
 									]
 		
-	return PlotTask(task, 
-									init_sliders, 
-									Helpers.myPlots.plot_obs(task.get_data))
+	return PlotTask(task, init_sliders, Helpers.myPlots.plot_obs(task))
 
 end
 
@@ -56,13 +49,30 @@ function LocalObservables(;observables, kwargs...)::PlotTask
 
 	return PlotTask((getproperty(pt0, k) for k in [:name, :get_plotparams, :get_paramcombs, :files_exist, :get_data])...,
 									Helpers.myPlots.init_localobs(observables),
-									Helpers.myPlots.plot_localobs(pt0.get_data, LayeredLattice)...)
+									Helpers.myPlots.plot_localobs(pt0, LayeredLattice)...)
 
 
 end
 
 
 
+#===========================================================================#
+#
+function Spectrum(;operators, kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	task = CompTask(Calculation(Hamilt_Diagonaliz;
+															operators=operators, kwargs...))
+
+	init_sliders = [Helpers.myPlots.init_oper(operators),
+									Helpers.myPlots.init_enlim([-4,4]),]
+
+	
+	return PlotTask(task, init_sliders, Helpers.myPlots.plot_oper(task))
+
+
+end
 
 
 
