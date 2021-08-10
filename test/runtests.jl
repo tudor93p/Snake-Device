@@ -10,7 +10,7 @@ include("$PATH_SNAKE/input_file.jl")
 
 println() 
 
-#include("gf.jl")
+include("gf.jl")
 
 println() 
 

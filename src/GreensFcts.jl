@@ -66,8 +66,6 @@ function Read(dev_params::UODict; target=nothing,
 							get_fname::Function, kwargs...
 						 )::Dict 
 
-	@show get_fname(dev_params)("DOS")
-
 	Helpers.GF.ReadObservables(get_fname(dev_params), 
 														 get_target(target; kwargs...))
 
