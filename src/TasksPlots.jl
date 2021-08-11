@@ -18,7 +18,8 @@ using ..Lattice.TasksPlots, ..Hamiltonian.TasksPlots
 
 #===========================================================================#
 #
-function Observables(; observables, kwargs...)::PlotTask
+function Observables(;observables::AbstractVector{<:AbstractString}, 
+										 kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
@@ -40,14 +41,14 @@ end
 
 #===========================================================================#
 #
-function LocalObservables(;observables, kwargs...)::PlotTask
+function LocalObservables(;observables::AbstractVector{<:AbstractString},
+													kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
 	pt0 = Observables(;observables=observables, kwargs...)
 
-
-	return PlotTask((getproperty(pt0, k) for k in [:name, :get_plotparams, :get_paramcombs, :files_exist, :get_data])...,
+	return PlotTask(pt0,
 									Helpers.myPlots.init_localobs(observables),
 									Helpers.myPlots.plot_localobs(pt0, LayeredLattice)...)
 
@@ -58,7 +59,8 @@ end
 
 #===========================================================================#
 #
-function Spectrum(;operators, kwargs...)::PlotTask
+function Spectrum(;operators::AbstractVector{<:AbstractString}, 
+									kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
@@ -68,9 +70,7 @@ function Spectrum(;operators, kwargs...)::PlotTask
 	init_sliders = [Helpers.myPlots.init_oper(operators),
 									Helpers.myPlots.init_enlim([-4,4]),]
 
-	
 	return PlotTask(task, init_sliders, Helpers.myPlots.plot_oper(task))
-
 
 end
 
