@@ -5,21 +5,22 @@ import Helpers.ObservableNames
 import myLibs: ComputeTasks, Parameters
 
 
-P = Dict(:length=>10,:width=>7, :Barrier_height=>1.0,:SCpx_magnitude=>0.4,:SCDW_position=>0.3,:delta=>0.002,:AtomToLayer=>"forced")
 
-id2 = Helpers.hParameters.merge_input_dicts(input_Device, input_GF)
+D = init(Device, true)
 
-PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, id2)
+
+PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, true)[2])
 
 #@show rand(Parameters.get_paramcombs(PF))[1]
 
-tasks = [f(;id2...) for f in [Device.TasksPlots.HParam,
-#															Device.TasksPlots.Latt,
-															Device.TasksPlots.LocalObservables,
-															Device.TasksPlots.Observables,
-															Device.TasksPlots.Spectrum,
-															]
-				 ]
+
+tasks = D.([
+						:HParam,
+#						:Latt,
+						:LocalObservables,
+						:Observables,
+						:Spectrum,
+						])
 
 #task = tasks[3]
 
@@ -56,7 +57,7 @@ ComputeTasks.get_plot_one.(tasks)
 #ComputeTasks.get_data_all(task, check_data=true, mute=false)
 
 
-Helpers.myPlots.plot(tasks)#; insets=insets)
+Helpers.myPlots.plot(tasks)#, only_prep=true)#; insets=insets)
 
 
 
