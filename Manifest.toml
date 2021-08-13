@@ -164,7 +164,7 @@ version = "1.5.2"
 
 [[Constants]]
 deps = ["Revise", "myLibs"]
-git-tree-sha1 = "4eb629f6d7489a02ab01e2ac9fbbd559ac98ac6e"
+git-tree-sha1 = "e8c6ee308138eecde4b39fcc6432b1c04d178c14"
 repo-rev = "main"
 repo-url = "../../Constants"
 uuid = "26e1ccdb-dc7d-4967-a216-0e9bd72dc499"
@@ -226,9 +226,9 @@ version = "1.0.3"
 
 [[DiffRules]]
 deps = ["NaNMath", "Random", "SpecialFunctions"]
-git-tree-sha1 = "85d2d9e2524da988bffaf2a381864e20d2dae08d"
+git-tree-sha1 = "3ed8fa7178a10d1cd0f1ca524f249ba6937490c0"
 uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
-version = "1.2.1"
+version = "1.3.0"
 
 [[Distances]]
 deps = ["LinearAlgebra", "Statistics", "StatsAPI"]
@@ -402,7 +402,7 @@ version = "0.9.13"
 
 [[Helpers]]
 deps = ["Constants", "Distributed", "LinearAlgebra", "OrderedCollections", "PyCall", "PyPlot", "Revise", "Test", "myLibs"]
-git-tree-sha1 = "a788a485196e550775c25f1c27e9d31c0644f9e4"
+git-tree-sha1 = "4fa1d1800ac51629f7eca4a7f04f99a8a24bb271"
 repo-rev = "main"
 repo-url = "../../Helpers"
 uuid = "fd2d3303-ab2f-4175-b0e0-24add640a121"
