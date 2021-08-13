@@ -3,11 +3,11 @@ using Constants: PATH_SNAKE
 
 include("$PATH_SNAKE/input_file.jl")
 
-#include("h.jl")
+include("h.jl")
 
 println() 
 
-#include("gf.jl")
+include("gf.jl")
 
 println() 
 
