@@ -6,12 +6,13 @@ using Device
 
 using Helpers.Calculations: Calculation
 
+@show Lattice.adjust_paramcomb(1, Dict())
 
 P = Dict(:length=>10,:width=>7, :Barrier_height=>1.0,:SCpx_magnitude=>0.4,:SCDW_position=>0.3,) 
 P = Dict(:length=>10,:width=>7, :Barrier_height=>1.0,:SCpx_magnitude=>0.4,:SCDW_position=>0.3,:delta=>0.002,:AtomToLayer=>"forced")
 
 
-@show Lattice.dist_to_dw(P)([1,2])
+@show Hamiltonian.dist_to_dw(P)([1,2])
 
 L = Lattice.Latt(P) 
 
