@@ -5,7 +5,7 @@ import Helpers
 
 using myLibs.ComputeTasks: CompTask  
 using Helpers.Calculations: Calculation  
-using Helpers.myPlots: PlotTask 
+using myPlots: PlotTask 
 
 using Constants: ENERGIES
 
@@ -28,11 +28,11 @@ function Observables(;observables::AbstractVector{<:AbstractString},
 
 									#constrained_params=[1=>constrained_params])
 														
-	init_sliders = [Helpers.myPlots.init_obs(observables),
-									Helpers.myPlots.init_enlim(ENERGIES)
+	init_sliders = [myPlots.Sliders.init_obs(observables),
+									myPlots.Sliders.init_enlim(ENERGIES)
 									]
 		
-	return PlotTask(task, init_sliders, Helpers.myPlots.plot_obs(task))
+	return PlotTask(task, init_sliders, myPlots.TypicalPlots.obs(task))
 
 end
 
@@ -49,8 +49,8 @@ function LocalObservables(;observables::AbstractVector{<:AbstractString},
 	pt0 = Observables(;observables=observables, kwargs...)
 
 	return PlotTask(pt0,
-									Helpers.myPlots.init_localobs(observables),
-									Helpers.myPlots.plot_localobs(pt0, LayeredLattice)...)
+									myPlots.Sliders.init_localobs(observables),
+									myPlots.TypicalPlots.localobs(pt0, LayeredLattice)...)
 
 
 end
@@ -67,10 +67,10 @@ function Spectrum(;operators::AbstractVector{<:AbstractString},
 	task = CompTask(Calculation(Hamilt_Diagonaliz;
 															operators=operators, kwargs...))
 
-	init_sliders = [Helpers.myPlots.init_oper(operators),
-									Helpers.myPlots.init_enlim([-4,4]),]
+	init_sliders = [myPlots.Sliders.init_oper(operators),
+									myPlots.Sliders.init_enlim([-4,4]),]
 
-	return PlotTask(task, init_sliders, Helpers.myPlots.plot_oper(task))
+	return PlotTask(task, init_sliders, myPlots.TypicalPlots.oper(task))
 
 end
 
