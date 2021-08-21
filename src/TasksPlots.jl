@@ -51,8 +51,7 @@ function LocalObservables(;observables::AbstractVector{<:AbstractString},
 
 	pt0 = Observables(;observables=observables, kwargs...)
 
-	return PlotTask(pt0,
-									(:localobs, observables),
+	return PlotTask(pt0, (:localobs, observables),
 									myPlots.TypicalPlots.localobs(pt0, LayeredLattice)...)
 
 
@@ -61,7 +60,7 @@ end
 #===========================================================================#
 #
 function LocalObservablesCut(;observables::AbstractVector{<:AbstractString},
-													kwargs...)#::PlotTask
+													kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
