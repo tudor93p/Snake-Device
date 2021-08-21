@@ -1,7 +1,7 @@
 name = "Device"
 uuid = "e96839a6-2cd5-4450-b5bb-343f8e02772d"
 authors = ["tudor <tudor.pahomi@gmail.com>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 Constants = "26e1ccdb-dc7d-4967-a216-0e9bd72dc499"

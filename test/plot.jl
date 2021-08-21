@@ -1,5 +1,6 @@
 import Device 
-import Helpers 
+import Helpers, myPlots 
+
 import Helpers.ObservableNames
 #using Helpers.Calculations: Calculation
 import myLibs: ComputeTasks, Parameters
@@ -17,7 +18,7 @@ PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, tru
 tasks = D.([
 						:HParam,
 #						:Latt,
-						:LocalObservables,
+#						:LocalObservables,
 						:Observables,
 						:Spectrum,
 						])
@@ -57,7 +58,7 @@ ComputeTasks.get_plot_one.(tasks)
 #ComputeTasks.get_data_all(task, check_data=true, mute=false)
 
 
-#Helpers.myPlots.plot(tasks)#, only_prep=true)#; insets=insets)
+myPlots.plot(tasks)#, only_prep=true)#; insets=insets)
 
 
 

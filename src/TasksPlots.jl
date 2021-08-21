@@ -1,7 +1,7 @@
 module TasksPlots
 #############################################################################
 
-import Helpers  
+import myPlots
 
 using myLibs.ComputeTasks: CompTask  
 using Helpers.Calculations: Calculation  
