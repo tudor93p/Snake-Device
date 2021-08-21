@@ -65,9 +65,9 @@ version = "1.0.6+5"
 
 [[CGAL]]
 deps = ["CxxWrap", "Requires", "libcgal_julia_jll"]
-git-tree-sha1 = "252ac366f3946213e2009a9f43a8a229992a6f28"
+git-tree-sha1 = "97290145152c6e1360c6616a197eace6e7848ec3"
 uuid = "15fcbb24-5a00-427b-98c5-e32879a22884"
-version = "0.5.1"
+version = "0.5.3"
 
 [[CGAL_jll]]
 deps = ["Artifacts", "GMP_jll", "JLLWrappers", "Libdl", "MPFR_jll", "Pkg", "Zlib_jll", "boost_jll"]
@@ -164,7 +164,7 @@ version = "1.5.2"
 
 [[Constants]]
 deps = ["Revise", "myLibs"]
-git-tree-sha1 = "5d02d9998dfae9587698514dd7ac6f61e935b2f0"
+git-tree-sha1 = "2364cba844c059726bec60560527d13c30910f0e"
 repo-rev = "main"
 repo-url = "../../Constants"
 uuid = "26e1ccdb-dc7d-4967-a216-0e9bd72dc499"
@@ -402,7 +402,7 @@ version = "0.9.13"
 
 [[Helpers]]
 deps = ["Constants", "Distributed", "LinearAlgebra", "OrderedCollections", "PyCall", "PyPlot", "Revise", "Test", "myLibs"]
-git-tree-sha1 = "3d7bdc167cd42bf75b0d4ef26afa495b4b0111be"
+git-tree-sha1 = "96bb5fe968fa177855ede9a4aaa64edda6981f28"
 repo-rev = "main"
 repo-url = "../../Helpers"
 uuid = "fd2d3303-ab2f-4175-b0e0-24add640a121"
@@ -678,9 +678,9 @@ version = "0.6.7"
 
 [[Missings]]
 deps = ["DataAPI"]
-git-tree-sha1 = "4ea90bd5d3985ae1f9a908bd4500ae88921c5ce7"
+git-tree-sha1 = "2ca267b08821e86c5ef4376cffed98a46c2cb205"
 uuid = "e1d29d7a-bbdc-5cf2-9ac0-f12de2c33e28"
-version = "1.0.0"
+version = "1.0.1"
 
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
@@ -755,9 +755,9 @@ version = "8.44.0+0"
 
 [[Parsers]]
 deps = ["Dates"]
-git-tree-sha1 = "477bf42b4d1496b454c10cce46645bb5b8a0cf2c"
+git-tree-sha1 = "438d35d2d95ae2c5e8780b330592b6de8494e779"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.0.2"
+version = "2.0.3"
 
 [[Pixman_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1220,7 +1220,7 @@ version = "0.1.0"
 
 [[myPlots]]
 deps = ["Constants", "FFTW", "LinearAlgebra", "PyCall", "Revise", "Test", "myLibs"]
-git-tree-sha1 = "05dfcd41be35ff4878a39630aacbafb867e2a74d"
+git-tree-sha1 = "8090703e184cd4473231aeb7716772b5a44ed657"
 repo-rev = "main"
 repo-url = "../../myPlots"
 uuid = "ab28f933-13dd-4a82-b110-d2be63b453ac"
