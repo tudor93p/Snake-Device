@@ -4,4 +4,7 @@ test/savefile
 pyqt_figures 
 src/Hamiltonian 
 src/Lattice
-src/LayeredLattice 
+src/LayeredLattice  
+
+
+Manifest.toml
