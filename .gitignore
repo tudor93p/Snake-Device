@@ -6,6 +6,6 @@ pyqt_config
 src/Hamiltonian 
 src/Lattice
 src/LayeredLattice  
+*/.*.swp
 
 
-Manifest.toml
