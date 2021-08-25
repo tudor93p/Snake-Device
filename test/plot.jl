@@ -16,12 +16,12 @@ PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, tru
 
 
 tasks = D.([
-#						:HParam,
+						:HParam,
 #						:Latt,
 						:LocalObservables,
-						:LocalObservablesCut,
-#						:Observables,
-#						:Spectrum,
+#						:LocalObservablesCut,
+						:Observables,
+						:Spectrum,
 						])
 
 #task = tasks[3]
@@ -50,17 +50,34 @@ println()
 
 
 #ComputeTasks.get_data_one(task, mute=false)
+	
+for L in [25, 50]#extrema(input_Device[:allparams][:length])
+	
+h = first(input_Device[:allparams][:Barrier_height]) 
 
-P = (length = 75, Barrier_height = 2.0, Barrier_width = 0.03, SCDW_p = 2, SCDW_width = 0.005, SCDW_position = 0, SCpx_magnitude = 0.4, delta = 0.002, width = 37, SCpy_magnitude = 0.4)
+phi = input_Device[:allparams][:SCDW_phasediff][1]
 
-plot_P = OrderedDict{String, Any}("length" => 75, "Barrier_height" => 2.0, "Barrier_width" => 0.03, "SCDW_p" => 2, "SCDW_width" => 0.005, "SCDW_position" => 0, "SCpx_magnitude" => 0.4, "delta" => 0.002, "width" => 37, "SCpy_magnitude" => 0.4, "Attached_Leads" => "AB", "Lead_Coupling" => 1.0, "Lead_Width" => 0.5, "A__ChemPot" => 0.0, "A__Hopping" => 1.0, "A__Label" => "A", "A__Direction" => -1, "A__Contact" => (-1, 1), "A__Lead_Width" => 18, "A__Lead_Coupling" => 1.0, "A__SCbasis" => true, "B__ChemPot" => 0.0, "B__Hopping" => 1.0, "B__Label" => "B", "B__Direction" => 1, "B__Contact" => (1, -1), "B__Lead_Width" => 18, "B__Lead_Coupling" => 1.0, "B__SCbasis" => true)
+P = (length = L, Barrier_height = h, Barrier_width = 0.03, SCDW_p = 2, SCDW_width = 0.005, SCDW_position = 0, SCpx_magnitude = 0.4, delta = 0.002, width = div(L,2), SCpy_magnitude = 0.4, SCDW_phasediff = phi)
 
+l = div(div(L,2),2)
+
+println() 
+
+@show L h phi 
+
+
+plot_P = merge(OrderedDict(string(k)=>v for (k,v) in pairs(P)),
+							 OrderedDict( "Attached_Leads" => "AB", "Lead_Coupling" => 1.0, "Lead_Width" => 0.5, "A__ChemPot" => 0.0, "A__Hopping" => 1.0, "A__Label" => "A", "A__Direction" => -1, "A__Contact" => (-1, 1), "A__Lead_Width" => l, "A__Lead_Coupling" => 1.0, "A__SCbasis" => true, "B__ChemPot" => 0.0, "B__Hopping" => 1.0, "B__Label" => "B", "B__Direction" => 1, "B__Contact" => (1, -1), "B__Lead_Width" => l, "B__Lead_Coupling" => 1.0, "B__SCbasis" => true)
+							)
 
 for task in tasks 
 
 	println()
 
 	@info task.name 
+	@show 	task.files_exist(P)
+
+#	continue 
 
 add = ["Energy"=>0.157,"vec2scalar"=>"x","region"=>5, "obs_i"=>1,
 #					"transform"=>"Interpolate",
@@ -72,16 +89,21 @@ add = ["Energy"=>0.157,"vec2scalar"=>"x","region"=>5, "obs_i"=>1,
 														
 	println()
 
+
 	for (k,v) in pairs(out_dict)
 
-		println(k,"\t",(v isa String ? (v,) : (length(v)," ",typeof(v)))...)
+		print(k)
+
+		isnothing(v) || print("\t",(v isa String ? (v,) : (length(v)," ",typeof(v)))...)
+
+		println()
 
 	end 
 
 end 
 
 
-
+end 
 
 #ComputeTasks.get_data_all(task, check_data=true, mute=false)
 
