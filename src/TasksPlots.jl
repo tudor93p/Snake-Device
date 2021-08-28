@@ -21,16 +21,16 @@ using ..Lattice.TasksPlots, ..Hamiltonian.TasksPlots
 
 #===========================================================================#
 #
-function Observables(;observables::AbstractVector{<:AbstractString}, 
+function Observables(init_dict::AbstractDict;
+										 observables::AbstractVector{<:AbstractString}, 
 										 kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
 
-	task = CompTask(Calculation(GreensFcts; observables=observables, kwargs...))
+	task = CompTask(Calculation(GreensFcts, init_dict; 
+															observables=observables, kwargs...))
 
-									#constrained_params=[1=>constrained_params])
-														
 	init_sliders = [myPlots.Sliders.init_obs(observables),
 									myPlots.Sliders.init_enlim(ENERGIES)
 									]
@@ -44,12 +44,13 @@ end
 
 #===========================================================================#
 #
-function LocalObservables(;observables::AbstractVector{<:AbstractString},
+function LocalObservables(init_dict::AbstractDict;
+													observables::AbstractVector{<:AbstractString},
 													kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
-	pt0 = Observables(;observables=observables, kwargs...)
+	pt0 = Observables(init_dict; observables=observables, kwargs...)
 
 	return PlotTask(pt0, (:localobs, observables),
 									myPlots.TypicalPlots.localobs(pt0, LayeredLattice)...)
@@ -59,12 +60,13 @@ end
 
 #===========================================================================#
 #
-function LocalObservablesCut(;observables::AbstractVector{<:AbstractString},
-													kwargs...)::PlotTask
+function LocalObservablesCut(init_dict::AbstractDict;
+														 observables::AbstractVector{<:AbstractString},
+														 kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
-	pt0 = Observables(;observables=observables, kwargs...)
+	pt0 = Observables(init_dict; observables=observables, kwargs...)
 
 	default_obs = myPlots.Sliders.pick_local(observables)[1] 
 
@@ -125,18 +127,18 @@ end
 
 #===========================================================================#
 #
-function Spectrum(;operators::AbstractVector{<:AbstractString}, 
+function Spectrum(init_dict::AbstractDict;
+									operators::AbstractVector{<:AbstractString}, 
 									kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
-	task = CompTask(Calculation(Hamilt_Diagonaliz;
+	task = CompTask(Calculation(Hamilt_Diagonaliz, init_dict;
 															operators=operators, kwargs...))
 
-	init_sliders = [myPlots.Sliders.init_oper(operators),
-									myPlots.Sliders.init_enlim([-4,4]),]
-
-	return PlotTask(task, init_sliders, myPlots.TypicalPlots.oper(task))
+	return PlotTask(task, 
+									[(:oper, operators), (:enlim, [-4,4])],
+									myPlots.TypicalPlots.oper(task))
 
 end
 

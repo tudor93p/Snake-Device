@@ -5,13 +5,12 @@ include("$PATH_SNAKE/input_file.jl")
 
 #include("h.jl")
 
-println() 
 
-#include("gf.jl")
+#pr_in("gf")
 
-println() 
 
-include("plot.jl")
+pr_in("plot")
+
 
 
 

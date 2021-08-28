@@ -10,7 +10,7 @@ import myLibs: ComputeTasks, Parameters, Utils
 D = init(Device, true)
 
 
-PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, true)[2])
+PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, true)[1][1])
 
 #@show rand(Parameters.get_paramcombs(PF))[1]
 
@@ -51,7 +51,7 @@ println()
 
 #ComputeTasks.get_data_one(task, mute=false)
 	
-for L in [25, 50]#extrema(input_Device[:allparams][:length])
+for L in input_Device[:allparams][:length][1:2]
 	
 h = first(input_Device[:allparams][:Barrier_height]) 
 
