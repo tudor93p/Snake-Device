@@ -15,9 +15,8 @@ import ..Hamiltonian
 
 import ..LayeredLattice, ..GreensFcts, ..Hamilt_Diagonaliz
 
-using ..Lattice.TasksPlots, ..Hamiltonian.TasksPlots
-
-#using ..LayeredLattice.TasksPlots
+using ..Lattice.TasksPlots, ..LayeredLattice.TasksPlots
+using ..Hamiltonian.TasksPlots 
 
 #===========================================================================#
 #
