@@ -4,12 +4,26 @@ import Helpers, myPlots
 import Helpers.ObservableNames
 #using Helpers.Calculations: Calculation
 import myLibs: ComputeTasks, Parameters, Utils
-
+using BenchmarkTools
 
 
 D = init(Device, true)
 
+task = D(:LayeredPosAtoms)
 
+for P in task.get_paramcombs()
+
+	println(P[1][:length])
+
+	task.get_data(P..., mute=true)#false) 
+	@time task.get_data(P..., mute=true)#false) 
+
+	println()
+
+end 
+
+
+error()
 PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, true)[1][1])
 
 #@show rand(Parameters.get_paramcombs(PF))[1]

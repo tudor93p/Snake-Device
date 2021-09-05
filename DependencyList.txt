@@ -1,4 +1,5 @@
 src/Lattice git@github.com:tudor93p/Snake-Device-Lattice.git
-src/LayeredLattice git@github.com:tudor93p/Snake-Device-LayeredLattice.git
+src/LayeredLattice git@github.com:tudor93p/Snake-Device-LayeredLattice.git 
+src/RibbonLattice git@github.com:tudor93p/Snake-Device-RibbonLattice.git
 src/Hamiltonian git@github.com:tudor93p/Snake-Device-Hamiltonian.git
 

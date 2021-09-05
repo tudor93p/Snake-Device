@@ -8,25 +8,16 @@ include(FN(PATH_DEVICE, "Hamiltonian"))
 
 include(FN(PATH_DEVICE, "LayeredLattice"))
 
-
-using .LayeredLattice: Lattice
-#using .Hamiltonian: Lattice 
+#include(FN(PATH_DEVICE, "RibbonLattice"))
 
 
-export LayeredLattice, Lattice, Hamiltonian
+using .LayeredLattice: Lattice 
 
 
 
+export Lattice, LayeredLattice#, RibbonLattice
 
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-
-
-
+export Hamiltonian
 
 
 
@@ -44,6 +35,19 @@ export LayeredLattice, Lattice, Hamiltonian
 
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+
+
+
+
+
 
 #===========================================================================#
 #
@@ -54,7 +58,9 @@ export LayeredLattice, Lattice, Hamiltonian
 
 
 
-include("Hamilt_Diagonaliz.jl")
+include("Hamilt_Diagonaliz.jl") 
+
+include("Hamilt_Diagonaliz_Ribbon.jl")
 
 include("GreensFcts.jl")
 
