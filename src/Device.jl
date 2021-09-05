@@ -8,14 +8,14 @@ include(FN(PATH_DEVICE, "Hamiltonian"))
 
 include(FN(PATH_DEVICE, "LayeredLattice"))
 
-#include(FN(PATH_DEVICE, "RibbonLattice"))
+include(FN(PATH_DEVICE, "RibbonLattice"))
 
 
 using .LayeredLattice: Lattice 
 
 
 
-export Lattice, LayeredLattice#, RibbonLattice
+export Lattice, LayeredLattice, RibbonLattice
 
 export Hamiltonian
 

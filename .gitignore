@@ -5,6 +5,7 @@ pyqt_figures
 pyqt_config
 src/Hamiltonian 
 src/Lattice
+src/RibbonLattice
 src/LayeredLattice  
 */.*.swp
 

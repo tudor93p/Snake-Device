@@ -13,7 +13,8 @@ using Constants: ENERGIES
 
 import ..Hamiltonian
 
-import ..LayeredLattice, ..GreensFcts, ..Hamilt_Diagonaliz
+import ..LayeredLattice, ..GreensFcts
+import ..Hamilt_Diagonaliz, ..Hamilt_Diagonaliz_Ribbon
 
 using ..Lattice.TasksPlots, ..LayeredLattice.TasksPlots
 using ..Hamiltonian.TasksPlots 
@@ -142,6 +143,22 @@ function Spectrum(init_dict::AbstractDict;
 end
 
 
+#===========================================================================#
+#
+function RibbonSpectrum(init_dict::AbstractDict;
+									operators::AbstractVector{<:AbstractString}, 
+									kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	task = CompTask(Calculation(Hamilt_Diagonaliz_Ribbon, init_dict;
+															operators=operators, kwargs...))
+
+	return PlotTask(task, 
+									[(:oper, operators), (:enlim, [-4,4])],
+									myPlots.TypicalPlots.oper(task))
+
+end
 
 
 
