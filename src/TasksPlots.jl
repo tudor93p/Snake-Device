@@ -220,7 +220,7 @@ function RibbonDOS_vsK(init_dict::AbstractDict;
 		
 			"x" => ks*2pi,
 
-			"xlim" => extrema(ks),
+			"xlim" => extrema(ks)*2pi,
 
 			"y"=> DOS/maximum(DOS),
 
