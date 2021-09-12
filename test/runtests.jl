@@ -13,7 +13,10 @@ import Device
 #pr_in("plot") 
 
 
-pr_in("ribbon")
+#pr_in("ribbon")
+
+pr_in("ribbon_DOSvsK")
+
 
 
 

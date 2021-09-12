@@ -3,13 +3,13 @@ module TasksPlots
 
 import myPlots
 
-import myLibs: Utils 
+import myLibs: Utils, ComputeTasks
 
 using myLibs.ComputeTasks: CompTask  
 using Helpers.Calculations: Calculation  
 using myPlots: PlotTask 
 
-using Constants: ENERGIES
+using Constants: ENERGIES, NR_KPOINTS
 
 import ..Hamiltonian
 
@@ -181,11 +181,160 @@ function RibbonLocalOper(init_dict::AbstractDict;
 end
 
 
+function calc_DOSatEvsK(P::AbstractDict, 
+												(Data,oper)::Tuple{<:AbstractDict,<:AbstractString};
+												ks::AbstractVector{<:Real}, kwargs...)
+
+	if !all(isapprox.(extrema(ks), extrema(Data["kLabels"])))
+
+		Data["kLabels"] .= Utils.Rescale(Data["kLabels"], ks)
+
+	end 
+
+
+	weights = myPlots.Transforms.SamplingWeights(Utils.adapt_merge(P, "k"=>ks); Data=Data, get_k=true)
+
+	DOS = dropdims(sum(weights, dims=2), dims=2) 
+		
+	Z = if haskey(Data, oper) && count(size(Data[oper]).!=1)<=1
+
+		dropdims(sum(reshape(Data[oper],1,:).*weights; dims=2), dims=2)./DOS 
+
+			else 
+				nothing 
+
+			end 
+		
+	return ((DOS, Z), "E=" * string(round(P["Energy"],digits=2)))
+
+end 
+
+
+#===========================================================================#
+#
+function RibbonDOS_vsK(init_dict::AbstractDict;
+													operators::AbstractVector{<:AbstractString},
+													kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	task = CompTask(Calculation(Hamilt_Diagonaliz_Ribbon, init_dict;
+															operators=operators, kwargs...))
+
+
+	md,sd = myPlots.main_secondary_dimensions()
+
+	ks = range(0, 1, length=NR_KPOINTS) 
+
+
+	function plot(P::AbstractDict)::Dict
+
+		for q in ["Energy","E_width","k_width"]
+			@assert haskey(P, q) q
+		end 
+
+
+		oper = get(P, "oper", "")
+
+		Data = task.get_data(P, mute=false, fromPlot=true, target=oper)
+
+
+		(DOS, Z), label = calc_DOSatEvsK(P, (Data, oper); ks=ks)
+
+
+
+		out = Dict(
+
+			"xlabel" => haskey(Data, "kTicks") ? "\$k_$sd\$" : "Eigenvalue index",
+		
+			"x" => ks,
+
+			"xlim" => extrema(ks),
+
+			"y"=> DOS/maximum(DOS),
+
+			"ylim" => [0,1],
+
+			"ylabel"=> "DOS",
+
+			"z" => Z,
+
+			"zlim"=> isnothing(Z) ? Z : get.([P],["opermin","opermax"],extrema(Z)),
+
+			"zlabel" => oper,
+
+			"label" => label,
+						)
+		
+		return out 
+
+	end 
+
+
+
+	return PlotTask(task, (:oper, operators), "Scatter", plot)
+
+end 
 
 
 
 
 
+
+
+#===========================================================================#
+#
+function RibbonDOS_vsK_vsX(init_dict::AbstractDict;
+													operators::AbstractVector{<:AbstractString},
+													X::Symbol,
+													kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	
+	ks = range(0, 1, length=NR_KPOINTS)  
+	
+	md,sd = myPlots.main_secondary_dimensions()
+
+	task, out_dict, construct_Z, = ComputeTasks.init_multitask(
+						Calculation(Hamilt_Diagonaliz_Ribbon, init_dict;
+												operators=operators, kwargs...),
+						[X=>1], [1=>ks], ["\$k_$sd\$"])
+
+
+
+	function plot(P::AbstractDict)::Dict
+
+		for q in ["Energy","E_width","k_width"]
+			@assert haskey(P, q) q
+
+		end 
+
+		function apply_rightaway(Data::AbstractDict, good_P)
+			
+			print('\r',X," = ",good_P[1][X])
+
+			DOS = calc_DOSatEvsK(P, (Data, ""); ks=ks)[1][1]
+
+			return DOS/maximum(DOS)
+
+		end 
+
+		
+		Z = construct_Z(identity,  P; mute=true, apply_rightaway=apply_rightaway, target=P["oper"])
+		
+		println("\r","                                       ")
+
+
+		return merge!(Z, out_dict, Dict("zlabel"=>"DOS","zlim"=>[0,1]))
+
+	end 
+
+
+	return PlotTask(task, #(:oper, operators),  
+									"Z_vsX_vsY", plot)
+
+end 
 
 
 
