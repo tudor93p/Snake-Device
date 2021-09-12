@@ -181,34 +181,6 @@ function RibbonLocalOper(init_dict::AbstractDict;
 end
 
 
-function calc_DOSatEvsK(P::AbstractDict, 
-												(Data,oper)::Tuple{<:AbstractDict,<:AbstractString};
-												ks::AbstractVector{<:Real}, kwargs...)
-
-	if !all(isapprox.(extrema(ks), extrema(Data["kLabels"])))
-
-		Data["kLabels"] .= Utils.Rescale(Data["kLabels"], ks)
-
-	end 
-
-
-	weights = myPlots.Transforms.SamplingWeights(Utils.adapt_merge(P, "k"=>ks); Data=Data, get_k=true)
-
-	DOS = dropdims(sum(weights, dims=2), dims=2) 
-		
-	Z = if haskey(Data, oper) && count(size(Data[oper]).!=1)<=1
-
-		dropdims(sum(reshape(Data[oper],1,:).*weights; dims=2), dims=2)./DOS 
-
-			else 
-				nothing 
-
-			end 
-		
-	return ((DOS, Z), "E=" * string(round(P["Energy"],digits=2)))
-
-end 
-
 
 #===========================================================================#
 #
@@ -238,9 +210,8 @@ function RibbonDOS_vsK(init_dict::AbstractDict;
 
 		Data = task.get_data(P, mute=false, fromPlot=true, target=oper)
 
-
-		(DOS, Z), label = calc_DOSatEvsK(P, (Data, oper); ks=ks)
-
+		(DOS, Z), label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data, oper); 
+																														ks=ks)
 
 
 		out = Dict(
@@ -314,7 +285,7 @@ function RibbonDOS_vsK_vsX(init_dict::AbstractDict;
 			
 			print('\r',X," = ",good_P[1][X])
 
-			DOS = calc_DOSatEvsK(P, (Data, ""); ks=ks)[1][1]
+			DOS = myPlots.Transforms.convol_DOSatEvsK1D(P, Data; ks=ks)[1][1]
 
 			return DOS/maximum(DOS)
 
