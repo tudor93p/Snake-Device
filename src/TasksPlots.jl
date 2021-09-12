@@ -196,7 +196,7 @@ function RibbonDOS_vsK(init_dict::AbstractDict;
 
 	md,sd = myPlots.main_secondary_dimensions()
 
-	ks = range(0, 1, length=NR_KPOINTS) 
+	ks = range(0.2, 0.8, length=NR_KPOINTS) 
 
 
 	function plot(P::AbstractDict)::Dict
@@ -218,7 +218,7 @@ function RibbonDOS_vsK(init_dict::AbstractDict;
 
 			"xlabel" => haskey(Data, "kTicks") ? "\$k_$sd\$" : "Eigenvalue index",
 		
-			"x" => ks,
+			"x" => ks*2pi,
 
 			"xlim" => extrema(ks),
 
@@ -263,14 +263,14 @@ function RibbonDOS_vsK_vsX(init_dict::AbstractDict;
 #---------------------------------------------------------------------------#
 
 	
-	ks = range(0, 1, length=NR_KPOINTS)  
+	ks = range(0.2, 0.8, length=NR_KPOINTS)  
 	
 	md,sd = myPlots.main_secondary_dimensions()
 
 	task, out_dict, construct_Z, = ComputeTasks.init_multitask(
 						Calculation(Hamilt_Diagonaliz_Ribbon, init_dict;
 												operators=operators, kwargs...),
-						[X=>1], [1=>ks], ["\$k_$sd\$"])
+						[X=>1], [2=>ks*2pi], ["\$k_$sd\$"])
 
 
 
@@ -302,8 +302,7 @@ function RibbonDOS_vsK_vsX(init_dict::AbstractDict;
 	end 
 
 
-	return PlotTask(task, #(:oper, operators),  
-									"Z_vsX_vsY", plot)
+	return PlotTask(task, "Z_vsX_vsY", plot)
 
 end 
 
