@@ -20,6 +20,37 @@ import ..Hamilt_Diagonaliz, ..Hamilt_Diagonaliz_Ribbon
 using ..Lattice.TasksPlots, ..LayeredLattice.TasksPlots
 using ..Hamiltonian.TasksPlots 
 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+function Ribbon_ks(zoomk::Real=1)::Vector{Float64}
+
+	@assert 0<zoomk<=1 
+
+	0.5 .+ range(-1, 1, length=NR_KPOINTS)*zoomk/2
+
+end 
+
+
+function Ribbon_ks(P::AbstractDict)::Vector{Float64}
+
+	haskey(P, "zoomk") ? Ribbon_ks(P["zoomk"]) : Ribbon_ks()
+
+end 
+
+
+
+
+
+
 #===========================================================================#
 #
 function Observables(init_dict::AbstractDict;
@@ -190,14 +221,14 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 #
 #---------------------------------------------------------------------------#
 
-	task = CompTask(Calculation("Fermi Surface",
+	task = CompTask(Calculation("Ribbon Fermi Surface",
 															Hamilt_Diagonaliz_Ribbon, init_dict;
 															operators=operators, kwargs...))
 
 
 	md,sd = myPlots.main_secondary_dimensions()
 
-	ks = range(0.2, 0.8, length=NR_KPOINTS) 
+	ks = Ribbon_ks()
 
 
 	function plot(P::AbstractDict)::Dict
@@ -211,21 +242,25 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 
 		Data = task.get_data(P, mute=false, fromPlot=true, target=oper)
 
+
+		restricted_ks = Ribbon_ks(P)
+
+		@assert all(minimum(ks).<=extrema(Data["kLabels"]).<=maximum(ks))
+
+
 		(DOS, Z), label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data, oper); 
-																														ks=ks)
+																														ks=restricted_ks)
 
 
 		out = Dict(
 
 			"xlabel" => haskey(Data, "kTicks") ? "\$k_$sd\$" : "Eigenvalue index",
 		
-			"x" => ks*2pi,
-
-			"xlim" => extrema(ks*2pi),
+			"x" => restricted_ks*2pi,
 
 			"y"=> DOS/maximum(DOS),
 
-			"ylim" => [0,1],
+			"ylim" => [0,get(P,"saturation",1)],
 
 			"ylabel"=> "DOS",
 
@@ -235,7 +270,7 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 
 			"zlabel" => oper,
 
-			"label" => label,
+			"label" => label[1],
 						)
 		
 		return out 
@@ -244,10 +279,10 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 
 
 
-	return PlotTask(task, (:oper, operators), "Scatter", plot)
+	return PlotTask(task, (:oper, operators), 
+									"FermiSurface_1D", plot)
 
 end 
-
 
 
 
@@ -263,47 +298,61 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 #
 #---------------------------------------------------------------------------#
 
-	
-	ks = range(0.2, 0.8, length=NR_KPOINTS)  
+	ks = Ribbon_ks()
+
 	
 	md,sd = myPlots.main_secondary_dimensions()
 
 	task, out_dict, construct_Z, = ComputeTasks.init_multitask(
-						Calculation("Fermi Surface", Hamilt_Diagonaliz_Ribbon, init_dict;
+						Calculation("Ribbon Fermi Surface", Hamilt_Diagonaliz_Ribbon, init_dict;
 												operators=operators, kwargs...),
-						[X=>1], [2=>ks*2pi], ["\$k_$sd\$"])
+						[X=>1], [2=>ks], ["\$k_$sd\$"])
+ 
+
 
 
 
 	function plot(P::AbstractDict)::Dict
 
-		for q in ["Energy","E_width","k_width"]
+		for q in ["Energy","E_width","k_width"] 
+
 			@assert haskey(P, q) q
 
 		end 
+		
+
+		restricted_ks = Ribbon_ks(P)
+
 
 		function apply_rightaway(Data::AbstractDict, good_P)
 			
 			print('\r',X," = ",good_P[1][X])
 
-			DOS = myPlots.Transforms.convol_DOSatEvsK1D(P, Data; ks=ks)[1][1]
+			@assert all(minimum(ks).<=extrema(Data["kLabels"]).<=maximum(ks))
+
+			DOS = myPlots.Transforms.convol_DOSatEvsK1D(P, Data;
+																									ks=restricted_ks)[1][1]
 
 			return DOS/maximum(DOS)
 
 		end 
 
 		
-		Z = construct_Z(identity,  P; mute=true, apply_rightaway=apply_rightaway, target=P["oper"])
+		Z = construct_Z(identity,  P; mute=true, 
+										apply_rightaway=apply_rightaway, target="Energy")
 		
 		println("\r","                                       ")
 
-
-		return merge!(Z, out_dict, Dict("zlabel"=>"DOS","zlim"=>[0,1]))
+		
+		return merge!(Z, out_dict, 
+									Dict("y"=>restricted_ks*2pi,
+											 "zlim"=>[0,get(P,"saturation",1)],
+											 "show_colorbar"=>false))
 
 	end 
 
 
-	return PlotTask(task, "Z_vsX_vsY", plot)
+	return PlotTask(task, "FermiSurface_1D_vsX", plot)
 
 end 
 

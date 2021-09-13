@@ -15,7 +15,7 @@ import Device
 
 #pr_in("ribbon")
 
-pr_in("ribbon_DOSvsK")
+pr_in("ribbon_FS")
 
 
 

@@ -10,15 +10,17 @@ import myLibs:Parameters, Utils, ComputeTasks
 D = init(Device)
 
 tasks = [D.([
-						:RibbonDOS_vsK,
+						:Ribbon_FermiSurface,
 						:RibbonSpectrum,
 						]);[
-				D(:RibbonDOS_vsK_vsX; X=:SCDW_phasediff),
-				D(:RibbonDOS_vsK_vsX; X=:Barrier_height),
+				D(:Ribbon_FermiSurface_vsX; X=:SCDW_phasediff),
+				D(:Ribbon_FermiSurface_vsX; X=:Barrier_height),
 				]]
 
 for task in tasks
-	
+
+	println()
+
 	@info task.name 
 	
 	for P in task.get_paramcombs()
@@ -35,7 +37,7 @@ for task in tasks
 	#	@show plot_P 
 	
 	
-	add = ["Energy"=>0.157, "E_width"=>0.1, "oper"=>"PH","k_width"=>0.02]
+	add = ["Energy"=>0.157, "E_width"=>0.1, "oper"=>"PH","k_width"=>0.02,"zoomk"=>0.9]
 	
 		out_dict = task.plot(Utils.adapt_merge(plot_P, add))
 															
@@ -62,7 +64,7 @@ end
 
 
 
-#myPlots.plot(tasks)
+myPlots.plot(tasks...)
 
 
 
