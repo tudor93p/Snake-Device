@@ -184,13 +184,14 @@ end
 
 #===========================================================================#
 #
-function RibbonDOS_vsK(init_dict::AbstractDict;
+function Ribbon_FermiSurface(init_dict::AbstractDict;
 													operators::AbstractVector{<:AbstractString},
 													kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
-	task = CompTask(Calculation(Hamilt_Diagonaliz_Ribbon, init_dict;
+	task = CompTask(Calculation("Fermi Surface",
+															Hamilt_Diagonaliz_Ribbon, init_dict;
 															operators=operators, kwargs...))
 
 
@@ -255,7 +256,7 @@ end
 
 #===========================================================================#
 #
-function RibbonDOS_vsK_vsX(init_dict::AbstractDict;
+function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 													operators::AbstractVector{<:AbstractString},
 													X::Symbol,
 													kwargs...)::PlotTask
@@ -268,7 +269,7 @@ function RibbonDOS_vsK_vsX(init_dict::AbstractDict;
 	md,sd = myPlots.main_secondary_dimensions()
 
 	task, out_dict, construct_Z, = ComputeTasks.init_multitask(
-						Calculation(Hamilt_Diagonaliz_Ribbon, init_dict;
+						Calculation("Fermi Surface", Hamilt_Diagonaliz_Ribbon, init_dict;
 												operators=operators, kwargs...),
 						[X=>1], [2=>ks*2pi], ["\$k_$sd\$"])
 
