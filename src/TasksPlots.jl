@@ -221,7 +221,7 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 		
 			"x" => ks*2pi,
 
-			"xlim" => extrema(ks)*2pi,
+			"xlim" => extrema(ks*2pi),
 
 			"y"=> DOS/maximum(DOS),
 
