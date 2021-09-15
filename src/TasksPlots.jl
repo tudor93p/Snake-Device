@@ -393,11 +393,11 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 
 		elseif all(z->z isa AbstractVector{<:Real}, Z)
 
-			out_dict["zlim"] = map([minimum,maximum]) do mM 
+			out_dict["zlim"] = map([minimum,maximum],["opermin","opermax"]) do F,K 
 				
-				get(P,"opermin") do 
+				get(P, K) do 
 
-						mM(mM, Z)
+						F(F, Z)
 
 					end 
 
