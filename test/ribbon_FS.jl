@@ -14,7 +14,7 @@ tasks = [D.([
 					:RibbonSpectrum,
 						]);[
 #				D(:Ribbon_FermiSurface_vsX; X=:SCDW_phasediff),
-				D(:Ribbon_FermiSurface_vsX; X=:Barrier_height),
+#				D(:Ribbon_FermiSurface_vsX; X=:Barrier_height),
 				]]
 
 for task in tasks
@@ -69,6 +69,8 @@ end
 
 
 
+
+ComputeTasks.missing_data(D(:RibbonSpectrum))
 
 
 myPlots.plot(tasks...)

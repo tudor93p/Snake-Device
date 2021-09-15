@@ -257,7 +257,6 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 
 
 
-
 		return Dict(
 
 			"xlabel" => haskey(Data, "kTicks") ? "\$k_$sd\$" : "Eigenvalue index",
@@ -344,6 +343,7 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 
 			(Y,Z),label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data,oper);
 																													ks=restricted_ks,
+																													normalize=false,
 																													f="first") 
 
 			#			label[1] (always): Energy choice
@@ -382,13 +382,14 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 		println("\r","                                       ")
 
 
-		zlab = only(unique(myPlots.join_label.(L)))
+		out_dict["zlabel"] = only(unique(L))
+
 
 		if all(isnothing, Z)
 		
 			out_dict["zlim"] = [0,get(P,"saturation",1)]
 
-			return merge!(construct_Z(Y, zlab), out_dict)
+			return merge!(construct_Z(Y), out_dict)
 
 
 		elseif all(z->z isa AbstractVector{<:Real}, Z)
@@ -403,7 +404,7 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 
 			end 
 
-			return merge!(construct_Z(Z, zlab), out_dict)
+			return merge!(construct_Z(Z), out_dict)
 
 		else 
 
