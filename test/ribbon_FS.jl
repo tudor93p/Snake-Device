@@ -11,10 +11,10 @@ D = init(Device)
 
 tasks = [D.([
 						:Ribbon_FermiSurface,
-						:RibbonSpectrum,
+					:RibbonSpectrum,
 						]);[
-				D(:Ribbon_FermiSurface_vsX; X=:SCDW_phasediff),
-				D(:Ribbon_FermiSurface_vsX; X=:Barrier_height),
+#				D(:Ribbon_FermiSurface_vsX; X=:SCDW_phasediff),
+#				D(:Ribbon_FermiSurface_vsX; X=:Barrier_height),
 				]]
 
 for task in tasks
@@ -37,7 +37,11 @@ for task in tasks
 	#	@show plot_P 
 	
 	
-	add = ["Energy"=>0.157, "E_width"=>0.1, "oper"=>"PH","k_width"=>0.02,"zoomk"=>0.9]
+	add = ["Energy"=>0.157, "E_width"=>0.1, 
+#				 "oper"=>"PH",
+				 "oper"=>"Velocity",
+				 "obs_i"=>2,
+				 "k_width"=>0.02,"zoomk"=>0.9]
 	
 		out_dict = task.plot(Utils.adapt_merge(plot_P, add))
 															
@@ -48,7 +52,7 @@ for task in tasks
 	
 			print(k)
 	
-			isnothing(v) || print("\t",(v isa String ? (v,) : (length(v)," ",typeof(v)))...)
+			isnothing(v) || print("\t",(v isa String ? (v,) : (length(v)," ",typeof(collect(v))))...)
 	
 			println()
 	

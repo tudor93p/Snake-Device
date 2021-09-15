@@ -248,11 +248,18 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 		@assert all(minimum(ks).<=extrema(Data["kLabels"]).<=maximum(ks))
 
 
-		(DOS, Z), label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data, oper); 
-																														ks=restricted_ks)
+		(DOS, Z), label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data, oper);
+																														ks=restricted_ks,
+																														f="first")
+
+		if length(label)==3 && oper=="Velocity" 
+
+			label[3] = string(only(label[3]) + ('x'-'1'))
+
+		end 
 
 
-		out = Dict(
+		return Dict(
 
 			"xlabel" => haskey(Data, "kTicks") ? "\$k_$sd\$" : "Eigenvalue index",
 		
@@ -268,12 +275,11 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 
 			"zlim"=> isnothing(Z) ? Z : get.([P],["opermin","opermax"],extrema(Z)),
 
-			"zlabel" => oper,
+			"zlabel" => myPlots.join_label(label[2:end]),
 
 			"label" => label[1],
 						)
 		
-		return out 
 
 	end 
 
@@ -304,7 +310,8 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 	md,sd = myPlots.main_secondary_dimensions()
 
 	task, out_dict, construct_Z, = ComputeTasks.init_multitask(
-						Calculation("Ribbon Fermi Surface", Hamilt_Diagonaliz_Ribbon, init_dict;
+						Calculation("Ribbon Fermi Surface", 
+												Hamilt_Diagonaliz_Ribbon, init_dict;
 												operators=operators, kwargs...),
 						[X=>1], [2=>ks], ["\$k_$sd\$"])
  
