@@ -9,7 +9,7 @@ using myLibs.ComputeTasks: CompTask
 using Helpers.Calculations: Calculation  
 using myPlots: PlotTask 
 
-using Constants: ENERGIES, NR_KPOINTS
+using Constants: ENERGIES, NR_KPOINTS, SECOND_DIM
 
 import ..Hamiltonian
 
@@ -237,11 +237,9 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 			@assert haskey(P, q) q
 		end 
 
-
 		oper = get(P, "oper", "")
 
 		Data = task.get_data(P, mute=false, fromPlot=true, target=oper)
-
 
 		restricted_ks = Ribbon_ks(P)
 
@@ -251,12 +249,13 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 		(DOS, Z), label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data, oper);
 																														ks=restricted_ks,
 																														f="first")
-
 		if length(label)==3 && oper=="Velocity" 
 
 			label[3] = string(only(label[3]) + ('x'-'1'))
 
 		end 
+
+
 
 
 		return Dict(
@@ -265,9 +264,9 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 		
 			"x" => restricted_ks*2pi,
 
-			"y"=> DOS/maximum(DOS),
+			"y"=> DOS/(maximum(DOS)+1e-12),
 
-			"ylim" => [0,get(P,"saturation",1)],
+			"ylim" => [0, 1]*get(P,"saturation",1),
 
 			"ylabel"=> "DOS",
 
@@ -278,6 +277,7 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 			"zlabel" => myPlots.join_label(label[2:end]),
 
 			"label" => label[1],
+
 						)
 		
 
@@ -329,32 +329,89 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 		
 
 		restricted_ks = Ribbon_ks(P)
+		
+		out_dict["y"] = restricted_ks*2pi 
 
 
-		function apply_rightaway(Data::AbstractDict, good_P)
+		oper = get(P, "oper", "")
+
+		function apply_rightaway(Data::AbstractDict, good_P
+														 )::Tuple{Vector{Float64}, Any, String}
 			
 			print('\r',X," = ",good_P[1][X])
 
 			@assert all(minimum(ks).<=extrema(Data["kLabels"]).<=maximum(ks))
 
-			DOS = myPlots.Transforms.convol_DOSatEvsK1D(P, Data;
-																									ks=restricted_ks)[1][1]
+			(Y,Z),label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data,oper);
+																													ks=restricted_ks,
+																													f="first") 
 
-			return DOS/maximum(DOS)
+			#			label[1] (always): Energy choice
+			#			label[2] (if oper exists, i.e. !isnothing(Z)): operator 
+			#			label[3] (if oper is multi-comp.): operator component
+
+
+			L1 = if isnothing(Z) 
+				
+							@assert length(label)==1 
+							
+							"DOS"
+
+						elseif oper=="Velocity"
+						
+							@assert length(label)==3 
+
+							myPlots.join_label(label[2], only(label[3])+('x'-'1');sep1="_")
+
+						else 
+
+							myPlots.join_label(label[2:end])
+
+						end 
+
+
+			return (Y/(maximum(Y)+1e-12), Z, 
+							myPlots.join_label(L1, label[1], sep1=" @"))
 
 		end 
 
-		
-		Z = construct_Z(identity,  P; mute=true, 
-										apply_rightaway=apply_rightaway, target="Energy")
+		Y,Z,L = collect.(zip(task.get_data(P, 
+																			 mute=true, target=oper, fromPlot=true,
+																			 apply_rightaway=apply_rightaway)...))
 		
 		println("\r","                                       ")
 
+
+		zlab = only(unique(myPlots.join_label.(L)))
+
+		if all(isnothing, Z)
 		
-		return merge!(Z, out_dict, 
-									Dict("y"=>restricted_ks*2pi,
-											 "zlim"=>[0,get(P,"saturation",1)],
-											 "show_colorbar"=>false))
+			out_dict["zlim"] = [0,get(P,"saturation",1)]
+
+			return merge!(construct_Z(Y, zlab), out_dict)
+
+
+		elseif all(z->z isa AbstractVector{<:Real}, Z)
+
+			out_dict["zlim"] = map([minimum,maximum]) do mM 
+				
+				get(P,"opermin") do 
+
+						mM(mM, Z)
+
+					end 
+
+			end 
+
+			return merge!(construct_Z(Z, zlab), out_dict)
+
+		else 
+
+			error(typeof.(Z))
+
+		end 
+
+#											 "show_colorbar"=>false))
 
 	end 
 

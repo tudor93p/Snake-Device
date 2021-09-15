@@ -1230,7 +1230,7 @@ version = "0.1.0"
 
 [[myPlots]]
 deps = ["Constants", "FFTW", "LinearAlgebra", "PyCall", "Revise", "Test", "myLibs"]
-git-tree-sha1 = "8acd9837c991358f2c50865114f0108f2241f13d"
+git-tree-sha1 = "9a94fdc3ee1c6b4a581d98d4b06a86c57303f38c"
 repo-rev = "main"
 repo-url = "../../myPlots"
 uuid = "ab28f933-13dd-4a82-b110-d2be63b453ac"

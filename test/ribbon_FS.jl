@@ -14,32 +14,35 @@ tasks = [D.([
 					:RibbonSpectrum,
 						]);[
 #				D(:Ribbon_FermiSurface_vsX; X=:SCDW_phasediff),
-#				D(:Ribbon_FermiSurface_vsX; X=:Barrier_height),
+				D(:Ribbon_FermiSurface_vsX; X=:Barrier_height),
 				]]
 
 for task in tasks
 
 	println()
 
+	println("-----------------------------------------------")
 	@info task.name 
+	println("-----------------------------------------------")
+
 	
 	for P in task.get_paramcombs()
 
 		P[1][:length]==10 || continue 
 		println()
-	
-	#	@show P 
+
+#		P[1] = Utils.adapt_merge(P[1], :SCDW_phasediff=>0.0, :Barrier_height=>0.001)
+
 		
 		@show 	task.files_exist(P...)
 	
 		plot_P = task.get_plotparams(P...)
 	
-	#	@show plot_P 
 	
 	
 	add = ["Energy"=>0.157, "E_width"=>0.1, 
-#				 "oper"=>"PH",
-				 "oper"=>"Velocity",
+				 "oper"=>"PH",
+#				 "oper"=>"Velocity",
 				 "obs_i"=>2,
 				 "k_width"=>0.02,"zoomk"=>0.9]
 	
