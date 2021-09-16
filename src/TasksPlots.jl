@@ -290,7 +290,9 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 	
 		if restrict_oper isa Function && !isnothing(Z)
 
-			@assert all(restrict_oper.(Z))
+			@show restrict_oper.(Z)
+
+			@assert all(restrict_oper, Z)
 
 		end 
 		
@@ -447,8 +449,18 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 
 
 		elseif all(z->z isa AbstractVector{<:Real}, Z)
-		
-			restrict_oper isa Function && @assert all(z->all(restrict_oper.(z)),Z)
+	
+			if restrict_oper isa Function 
+				
+				for z in Z 
+					
+					println(restrict_oper.(z))
+					@assert all(restrict_oper, z) #only if normalized
+
+				end 
+
+			end 
+
 
 			out_dict["zlim"] = map([minimum,maximum],["opermin","opermax"]) do F,K 
 				
