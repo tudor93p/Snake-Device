@@ -10,11 +10,11 @@ import myLibs:Parameters, Utils, ComputeTasks
 D = init(Device)
 
 tasks = [D.([
+						 :RibbonSpectrum,
 						:Ribbon_FermiSurface,
-					:RibbonSpectrum,
 						]);[
 #				D(:Ribbon_FermiSurface_vsX; X=:SCDW_phasediff),
-#				D(:Ribbon_FermiSurface_vsX; X=:Barrier_height),
+				D(:Ribbon_FermiSurface_vsX; X=:Barrier_height),
 				]]
 
 for task in tasks
@@ -28,22 +28,29 @@ for task in tasks
 	
 	for P in task.get_paramcombs()
 
-		P[1][:length]==10 || continue 
+		P[1][:length]==40 || continue  
+
+		get(P[1], :Barrier_height, 1.25)==1.25||continue 
+
 		println()
 
 #		P[1] = Utils.adapt_merge(P[1], :SCDW_phasediff=>0.0, :Barrier_height=>0.001)
 
 		
 		@show 	task.files_exist(P...)
+		task.files_exist(P...) || continue 
+
 	
 		plot_P = task.get_plotparams(P...)
 	
 	
 	
-	add = ["Energy"=>0.157, "E_width"=>0.1, 
+	add = ["Energy"=>0.06, "E_width"=>0.02, 
 				 "oper"=>"PH",
-#				 "oper"=>"Velocity",
+#				 "oper"=>"Velocity", 
+				 "opermin"=>0,# "opermax"=>10,
 				 "obs_i"=>2,
+				 "interp_method"=>:Rectangle,
 				 "k_width"=>0.02,"zoomk"=>0.9]
 	
 		out_dict = task.plot(Utils.adapt_merge(plot_P, add))

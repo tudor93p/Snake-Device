@@ -30,6 +30,40 @@ using ..Hamiltonian.TasksPlots
 #---------------------------------------------------------------------------#
 
 
+function get_restrict_oper(m::Real, M::Real)::Function 
+
+	r(x::Real)::Bool = m<=x<=M
+
+end 
+
+function get_restrict_oper(m::Real, ::Nothing)::Function 
+
+	r(x::Real)::Bool = m<=x
+
+end 
+function get_restrict_oper(::Nothing, M::Real)::Function 
+
+	r(x::Real)::Bool = x<=M
+
+end 
+
+get_restrict_oper(::Nothing, ::Nothing)::Nothing = nothing 
+
+
+function get_restrict_oper(P::AbstractDict) 
+	
+	get_restrict_oper(get.([P], ["opermin","opermax"], [nothing])...)
+
+end
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
 
 function Ribbon_ks(zoomk::Real=1)::Vector{Float64}
 
@@ -238,6 +272,8 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 		end 
 
 		oper = get(P, "oper", "")
+		restrict_oper = get_restrict_oper(P) 
+
 
 		Data = task.get_data(P, mute=false, fromPlot=true, target=oper)
 
@@ -248,14 +284,23 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 
 		(DOS, Z), label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data, oper);
 																														ks=restricted_ks,
+																														restrict_oper=restrict_oper,
 																														f="first")
+
+	
+		if restrict_oper isa Function && !isnothing(Z)
+
+			@assert all(restrict_oper.(Z))
+
+		end 
+		
 		if length(label)==3 && oper=="Velocity" 
 
 			label[3] = string(only(label[3]) + ('x'-'1'))
 
 		end 
 
-
+		@assert isnothing(Z) || isa(Z,AbstractVector{Float64})
 
 		return Dict(
 
@@ -331,8 +376,15 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 		
 		out_dict["y"] = restricted_ks*2pi 
 
+		out_dict["xline"] = get(P,string(X),nothing)
 
 		oper = get(P, "oper", "")
+		
+	
+		restrict_oper = get_restrict_oper(P) 
+
+		
+		
 
 		function apply_rightaway(Data::AbstractDict, good_P
 														 )::Tuple{Vector{Float64}, Any, String}
@@ -344,6 +396,7 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 			(Y,Z),label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data,oper);
 																													ks=restricted_ks,
 																													normalize=false,
+																													restrict_oper=restrict_oper,
 																													f="first") 
 
 			#			label[1] (always): Energy choice
@@ -382,6 +435,7 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 		println("\r","                                       ")
 
 
+
 		out_dict["zlabel"] = only(unique(L))
 
 
@@ -393,6 +447,8 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 
 
 		elseif all(z->z isa AbstractVector{<:Real}, Z)
+		
+			restrict_oper isa Function && @assert all(z->all(restrict_oper.(z)),Z)
 
 			out_dict["zlim"] = map([minimum,maximum],["opermin","opermax"]) do F,K 
 				
