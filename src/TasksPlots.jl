@@ -3,7 +3,7 @@ module TasksPlots
 
 import myPlots
 
-import myLibs: Utils, ComputeTasks
+import myLibs: Utils, ComputeTasks, Algebra
 
 using myLibs.ComputeTasks: CompTask  
 using Helpers.Calculations: Calculation  
@@ -30,31 +30,6 @@ using ..Hamiltonian.TasksPlots
 #---------------------------------------------------------------------------#
 
 
-function get_restrict_oper(m::Real, M::Real)::Function 
-
-	r(x::Real)::Bool = m<=x<=M
-
-end 
-
-function get_restrict_oper(m::Real, ::Nothing)::Function 
-
-	r(x::Real)::Bool = m<=x
-
-end 
-function get_restrict_oper(::Nothing, M::Real)::Function 
-
-	r(x::Real)::Bool = x<=M
-
-end 
-
-get_restrict_oper(::Nothing, ::Nothing)::Nothing = nothing 
-
-
-function get_restrict_oper(P::AbstractDict) 
-	
-	get_restrict_oper(get.([P], ["opermin","opermax"], [nothing])...)
-
-end
 
 
 #===========================================================================#
@@ -218,11 +193,243 @@ function RibbonSpectrum(init_dict::AbstractDict;
 #---------------------------------------------------------------------------#
 
 	task = CompTask(Calculation(Hamilt_Diagonaliz_Ribbon, init_dict;
-															operators=operators, kwargs...))
+															operators=operators, kwargs...)) 
 
 	return PlotTask(task, 
 									[(:oper, operators), (:enlim, [-4,4])],
-									myPlots.TypicalPlots.oper(task))
+									myPlots.TypicalPlots.oper(task)
+									)
+
+end
+
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+function separate_boundary_modes(Data::AbstractDict, 
+																 Elim::AbstractVector{<:Real})
+
+	separate_boundary_modes(Data, Tuple(Elim))
+
+end 
+
+function separate_boundary_modes(Data::AbstractDict, 
+																 Elim::Tuple{Real,Real},
+																 )::Vector{Vector{Vector{Float64}}}
+#	"Velocity","PH"
+
+	v = myPlots.Transforms.choose_color_i(
+										Dict("obs_i"=>SECOND_DIM), 
+										Data["Velocity"])[1]
+
+
+	# filter states with positive velocity 
+
+	x,y,v,ph = myPlots.Transforms.FilterStates(
+												Dict("filterstates"=>true,"opermin"=>0),
+												v, 
+												Data["kLabels"][:], 
+												Data["Energy"][:],
+												v,
+												Data["PH"][:],
+												)[1]
+	
+
+	# filter states in Elim (inside the gap) 
+	
+	@assert !isapprox(Elim..., atol=1e-4) "Energy window too small"
+
+	
+
+	x,y,v,ph = myPlots.Transforms.FilterStates(
+												Dict("filterstates"=>true,
+														 "opermin"=>Elim[1],
+														 "opermax"=>Elim[2]),
+												y, 
+												x, y, v, ph)[1]
+
+
+	# separate electron-/hole-like bands 
+	
+	return map(["opermin","opermax"]) do k
+
+		 x1, y1, v1, ph1 = myPlots.Transforms.FilterStates(
+												Dict("filterstates"=>true,k=>0),
+												ph, x, y, v, ph)[1] 
+
+		 x2,i2 = Utils.Unique(x1, inds=:first, sorted=true) # assume spin degen.
+
+		 return [x2, y1[i2], v1[i2], ph1[i2]]
+
+	end 
+
+
+end 
+
+
+
+
+
+
+
+
+
+
+
+
+#===========================================================================#
+#
+function RibbonBoundaryStates(init_dict::AbstractDict;
+									operators::AbstractVector{<:AbstractString}, 
+									kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	task = CompTask(Calculation("Ribbon DW States",
+															Hamilt_Diagonaliz_Ribbon, init_dict;
+															operators=operators, kwargs...)) 
+
+
+	md,sd = myPlots.main_secondary_dimensions() 
+
+	function plot(P::AbstractDict)
+
+		Data = task.get_data(P, mute=false, fromPlot=true, target=["Velocity","PH"])
+	
+
+		SCp = filter!(!isnothing, [get(P,string("SCp",c,"_magnitude"),nothing) for c in "xy"])
+
+		@assert !isempty(SCp) "No boundary modes without a gap"
+
+		E = sqrt(sum(abs2,SCp)/length(SCp))*(1.0-0.99get(P,"smooth",0))
+
+		E*=1.05  # => not sorted => test clean algo 
+
+		@assert !isapprox(E,0,atol=1e-5) "No boundary modes without a gap"
+		
+
+		states = separate_boundary_modes(Data, [-E,E])
+
+		xs,ys,vs,phs = Utils.zipmap(states) do item 
+			
+			interps = myPlots.Transforms.interp.(item[1:1], item[2:end])
+
+			Y = getindex.(interps,2)
+
+			@assert all(isa.(Y,AbstractVector{<:Real}))
+
+			return (interps[1][1], Y...)
+
+		end 
+
+#		@assert haskey(P, "Energy") && -E<P["Energy"]<E
+
+
+map(states[1:1]) do item 
+
+			k,e,v,ph = item 
+	
+#			E = E*0.8
+
+#			inds = -E.<e.<E
+
+#			k,e,v,ph = k[inds],e[inds],v[inds],ph[inds]
+
+#			@assert issorted(e) "E interval too large" 
+	
+
+		@show issorted(e) 
+
+#		good_inds = falses(length(e))
+#
+#		i0 = div(length(e),2)
+#
+#		good[i0]=true 
+#
+#
+#
+#		for i in 0:i0-1 
+#
+#			for k in [i0-i-1, i0+i+1]
+#
+#				good[k] = e[k+1]>=e[k] 
+#
+#
+
+
+
+#			if e[i1-1]>e[i1] 
+#
+#
+#			bad_inds = findall(diff(e[good_inds]).<0)
+#
+#			@show bad_inds 
+#
+#			isempty(bad_inds) && break 
+#
+#			for i in bad_inds 
+#
+#				good_inds[i] = false 
+#
+#			end
+
+		end 
+
+
+
+
+
+
+		e[i+1] > e[i] 
+
+		diff[i]>=0 
+
+
+		@show diff(e) 
+#			k0 = Algebra.Interp1D(e, k, 3, P["Energy"])
+
+#			@show k0 
+
+		end 
+
+
+
+
+	  out = Dict(
+
+			 "xs"=>xs,#(xs..., xs..., xs...),
+
+			 "ys"=>ys,#(ys...,vs...,phs...),
+
+#			"z"=>v,
+	
+			"xlabel" => haskey(Data, "kTicks") ? "\$k_$sd\$" : "Eigenvalue index",
+#			"ylim" => [0, 1]*get(P,"saturation",1),
+
+
+#			"zlim"=> extrema(v),
+
+#			"zlabel" => "Velocity_$sd",
+
+"labels" => ["E","H"],#["E1","E2","V1","V2","PH1","PH2"],
+
+			)
+
+		return out 
+
+
+
+	end 
+
+
+	return PlotTask(task, "Curves_Energy", plot,)
 
 end
 
@@ -271,8 +478,9 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 			@assert haskey(P, q) q
 		end 
 
-		oper = get(P, "oper", "")
-		restrict_oper = get_restrict_oper(P) 
+		oper = get(P, "oper", "") 
+
+
 
 
 		Data = task.get_data(P, mute=false, fromPlot=true, target=oper)
@@ -284,17 +492,12 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 
 		(DOS, Z), label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data, oper);
 																														ks=restricted_ks,
-																														restrict_oper=restrict_oper,
+																														restrict_oper=true,
 																														f="first")
 
 	
-		if restrict_oper isa Function && !isnothing(Z)
-
-			@show restrict_oper.(Z)
-
-			@assert all(restrict_oper, Z)
-
-		end 
+		@assert isnothing(Z) || isa(Z, AbstractVector{Float64})
+			
 		
 		if length(label)==3 && oper=="Velocity" 
 
@@ -302,9 +505,8 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 
 		end 
 
-		@assert isnothing(Z) || isa(Z,AbstractVector{Float64})
 
-		return Dict(
+		out = Dict(
 
 			"xlabel" => haskey(Data, "kTicks") ? "\$k_$sd\$" : "Eigenvalue index",
 		
@@ -325,6 +527,10 @@ function Ribbon_FermiSurface(init_dict::AbstractDict;
 			"label" => label[1],
 
 						)
+
+
+
+		return out 
 		
 
 	end 
@@ -383,7 +589,6 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 		oper = get(P, "oper", "")
 		
 	
-		restrict_oper = get_restrict_oper(P) 
 
 		
 		
@@ -391,42 +596,53 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 		function apply_rightaway(Data::AbstractDict, good_P
 														 )::Tuple{Vector{Float64}, Any, String}
 			
-			print('\r',X," = ",good_P[1][X])
+			print('\r',X," = ",good_P[1][X],"             ")
 
 			@assert all(minimum(ks).<=extrema(Data["kLabels"]).<=maximum(ks))
 
 			(Y,Z),label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data,oper);
 																													ks=restricted_ks,
 																													normalize=false,
-																													restrict_oper=restrict_oper,
+																													restrict_oper=true,
 																													f="first") 
 
 			#			label[1] (always): Energy choice
 			#			label[2] (if oper exists, i.e. !isnothing(Z)): operator 
 			#			label[3] (if oper is multi-comp.): operator component
+			#			label[4] (if oper+lim exist): "<0.3" or ">=-2" etc
 
 
-			L1 = if isnothing(Z) 
-				
-							@assert length(label)==1 
+			lO = isnothing(Z) ? "DOS" : label[2] 
+
+
+			lC,lL = if isnothing(Z) || length(label)==2 
+			
+									("","") 
 							
-							"DOS"
+							else 
 
-						elseif oper=="Velocity"
-						
-							@assert length(label)==3 
+								if oper=="Velocity"
+							
+									@assert length(label)>=3 
+	
+									label[3] = string(only(label[3])+('x'-'1'))
+	
+								end 
+	
+								if length(label)==4 label[3:4] else  
+	
+									length(label[3])==1 ? (label[3],"") : ("",label[3])
+	
+								end 
 
-							myPlots.join_label(label[2], only(label[3])+('x'-'1');sep1="_")
-
-						else 
-
-							myPlots.join_label(label[2:end])
-
-						end 
+							end 
 
 
-			return (Y/(maximum(Y)+1e-12), Z, 
-							myPlots.join_label(L1, label[1], sep1=" @"))
+			L = myPlots.join_label(isempty(lC) ? lO : string(lO,"_",lC),
+														 (isempty(lL) ? [] : [lL])...,
+														 "@"*label[1]; sep1=" ")
+									 
+			return (Y/(maximum(Y)+1e-12), Z, L)
 
 		end 
 
@@ -450,18 +666,6 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 
 		elseif all(z->z isa AbstractVector{<:Real}, Z)
 	
-			if restrict_oper isa Function 
-				
-				for z in Z 
-					
-					println(restrict_oper.(z))
-					@assert all(restrict_oper, z) #only if normalized
-
-				end 
-
-			end 
-
-
 			out_dict["zlim"] = map([minimum,maximum],["opermin","opermax"]) do F,K 
 				
 				get(P, K) do 
