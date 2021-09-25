@@ -113,9 +113,9 @@ version = "0.7.0"
 
 [[ColorSchemes]]
 deps = ["ColorTypes", "Colors", "FixedPointNumbers", "Random"]
-git-tree-sha1 = "9995eb3977fbf67b86d0a0a0508e83017ded03f2"
+git-tree-sha1 = "a851fec56cb73cfdf43762999ec72eff5b86882a"
 uuid = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
-version = "3.14.0"
+version = "3.15.0"
 
 [[ColorTypes]]
 deps = ["FixedPointNumbers", "Random"]
@@ -142,9 +142,9 @@ version = "0.3.0"
 
 [[Compat]]
 deps = ["Base64", "Dates", "DelimitedFiles", "Distributed", "InteractiveUtils", "LibGit2", "Libdl", "LinearAlgebra", "Markdown", "Mmap", "Pkg", "Printf", "REPL", "Random", "SHA", "Serialization", "SharedArrays", "Sockets", "SparseArrays", "Statistics", "Test", "UUIDs", "Unicode"]
-git-tree-sha1 = "1a90210acd935f222ea19657f143004d2c2a1117"
+git-tree-sha1 = "31d0151f5716b655421d9d75b7fa74cc4e744df2"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
-version = "3.38.0"
+version = "3.39.0"
 
 [[CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -1226,7 +1226,7 @@ version = "1.3.7+0"
 
 [[myLibs]]
 deps = ["Arpack", "CGAL", "Combinatorics", "ConcaveHull", "Dates", "DelimitedFiles", "Dierckx", "Distributed", "FFTW", "FileIO", "GeometryBasics", "JLD", "LightGraphs", "LinearAlgebra", "MetaGraphs", "OrderedCollections", "Plots", "PyCall", "PyPlot", "QHull", "Random", "Revise", "SparseArrays", "Test", "TikzGraphs", "TikzPictures"]
-git-tree-sha1 = "ef020fa653e6ef49841725d1d6655c228d45846e"
+git-tree-sha1 = "e16fadebac8824b22ea7bff16730e5d8764d8284"
 repo-rev = "main"
 repo-url = "git@github.com:tudor93p/myLibs.git"
 uuid = "0cc41259-d48e-4a81-8a6d-ec7e330e4bca"
@@ -1234,7 +1234,7 @@ version = "0.1.0"
 
 [[myPlots]]
 deps = ["Constants", "FFTW", "LinearAlgebra", "PyCall", "Revise", "Test", "myLibs"]
-git-tree-sha1 = "5b4356398083c023e1d812bd6346686004e1e1ff"
+git-tree-sha1 = "70a193412586c853cb301eaff130da9aaaa3a9b7"
 repo-rev = "main"
 repo-url = "../../myPlots"
 uuid = "ab28f933-13dd-4a82-b110-d2be63b453ac"

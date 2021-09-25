@@ -505,8 +505,6 @@ function Ribbon_FermiSurface2_vsX(init_dict::AbstractDict;
 		function apply_rightaway(Data::AbstractDict, good_P
 														 )::Vector{Float64}
 			
-			print('\r',X," = ",good_P[1][X],"             ")
-
 			getprop_onFermiSurface(Data, (-E,E), P["Energy"], oper)
 
 		end 
@@ -516,7 +514,6 @@ function Ribbon_FermiSurface2_vsX(init_dict::AbstractDict;
 		ys = collect.(eachcol(construct_Z(P; apply_rightaway=apply_rightaway,
 																		 target=["PH","Velocity",oper])["z"]))
 
-		println("\r","                                       ")
 		
 		out = Dict("xs"=>[out_dict["x"],out_dict["x"]],
 
@@ -552,8 +549,6 @@ function Ribbon_deltaK_vsX_vsY(init_dict::AbstractDict;
 #
 #---------------------------------------------------------------------------#
 
-	@assert X!=Y 
-
 	md,sd = myPlots.main_secondary_dimensions()
 
 	task, out_dict, construct_Z, = ComputeTasks.init_multitask(
@@ -578,16 +573,12 @@ function Ribbon_deltaK_vsX_vsY(init_dict::AbstractDict;
 		function apply_rightaway(Data::AbstractDict, good_P
 														 )::Float64
 			
-			print("\r($Y,$X) = (",good_P[1][Y],", ",good_P[1][X],")        ")
-
 			abs(only(diff(getprop_onFermiSurface(Data, (-E,E), P["Energy"]))))
 
 		end 
 
 		out = construct_Z(P; apply_rightaway=apply_rightaway,
 																		 target=["PH","Velocity"])
-
-		println("\r",repeat(" ",70))
 	
 		return merge!(out, out_dict)
 									
@@ -759,8 +750,6 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 		function apply_rightaway(Data::AbstractDict, good_P
 														 )::Tuple{Vector{Float64}, Any, String}
 			
-			print('\r',X," = ",good_P[1][X],"             ")
-
 			@assert all(minimum(ks).<=extrema(Data["kLabels"]).<=maximum(ks))
 
 			(Y,Z),label = myPlots.Transforms.convol_DOSatEvsK1D(P, (Data,oper);
@@ -813,7 +802,6 @@ function Ribbon_FermiSurface_vsX(init_dict::AbstractDict;
 																			 mute=true, target=oper, fromPlot=true,
 																			 apply_rightaway=apply_rightaway)...))
 		
-		println("\r","                                       ")
 
 
 

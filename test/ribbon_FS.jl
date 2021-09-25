@@ -7,6 +7,7 @@ import myLibs:Parameters, Utils, ComputeTasks
 #
 #PF = Helpers.hParameters.ParamFlow(H, input_args...)
 
+
 D = init(Device)
 
 tasks = [D.([
@@ -21,6 +22,7 @@ tasks = [D.([
 
 
 
+
 for task in tasks
 
 	println()
@@ -30,7 +32,7 @@ for task in tasks
 	println("-----------------------------------------------")
 
 	
-	for P in task.get_paramcombs()
+	for P in tasks[1].get_paramcombs()
 
 		P[1][:length]==40 || continue  
 
@@ -45,7 +47,7 @@ for task in tasks
 		task.files_exist(P...) || continue 
 
 	
-		plot_P = task.get_plotparams(P...)
+		plot_P = tasks[1].get_plotparams(P...)
 	
 	
 	
@@ -85,7 +87,7 @@ end
 ComputeTasks.missing_data(D(:RibbonSpectrum))
 
 
-myPlots.plot(tasks...)
+#myPlots.plot(tasks...)
 
 
 
