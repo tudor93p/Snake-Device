@@ -557,7 +557,7 @@ function Ribbon_deltaK_vsX_vsY(init_dict::AbstractDict;
 	md,sd = myPlots.main_secondary_dimensions()
 
 	task, out_dict, construct_Z, = ComputeTasks.init_multitask(
-						Calculation("Ribbon delta k", 
+						Calculation("Ribbon delta k$sd", 
 												Hamilt_Diagonaliz_Ribbon, init_dict;
 												operators=operators, kwargs...),
 					 [X=>1,Y=>1])
