@@ -594,7 +594,7 @@ function Ribbon_deltaK_vsX_vsY(init_dict::AbstractDict;
 	end  
 
 
-	return PlotTask(task, "Z_vsX_vsY", plot) 
+	return PlotTask(task, "Z_vsX_vsY_atE", plot) 
 
 end 
 
