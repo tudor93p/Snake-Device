@@ -213,17 +213,105 @@ end
 #---------------------------------------------------------------------------#
 
 
-function separate_boundary_modes(Data::AbstractDict, 
-																 Elim::AbstractVector{<:Real})
 
-	separate_boundary_modes(Data, Tuple(Elim))
+
+function window_boundary_states(P::AbstractDict)::Float64
+
+	SCp = filter!(!isnothing, [get(P,string("SCp",c,"_magnitude"),nothing) for c in "xy"])
+
+	@assert !isempty(SCp) "No boundary modes without a gap"
+
+	E = sqrt(sum(abs2,SCp)/length(SCp))*(1.0-0.99get(P,"smooth",0))
+
+	@assert !isapprox(E,0,atol=1e-5) "No boundary modes without a gap"
+		
+	return E 
 
 end 
 
-function separate_boundary_modes(Data::AbstractDict, 
+function separate_boundary_modes(get_data::Function,
+																 P::AbstractDict,
+																 arg::T=nothing
+																 )::Vector{Dict{String,Vector}} where T<:Union{Nothing, <:AbstractString, <:AbstractVector{<:AbstractString}}
+
+	separate_boundary_modes(get_data, P,
+													window_boundary_states(P)*[-1,1],
+													arg)
+
+end 
+
+
+function separate_boundary_modes(get_data::Function,
+																 P::AbstractDict,
+																 Elim::AbstractVector{<:Real},
+																 args...
+																 )::Vector{Dict{String,Vector}}
+
+	separate_boundary_modes(get_data, P, Tuple(Elim), args...)
+
+end 
+
+function separate_boundary_modes(get_data::Function,
+																 P::AbstractDict,
 																 Elim::Tuple{Real,Real},
-																 )::Vector{Vector{Vector{Float64}}}
-#	"Velocity","PH"
+																 ::Nothing=nothing
+																 )::Vector{Dict{String,Vector}}
+
+	separate_boundary_modes(get_data, P, Elim, String[])
+
+end  
+
+function separate_boundary_modes(get_data::Function,
+																 P::AbstractDict,
+																 Elim::Tuple{Real,Real},
+																 target::AbstractString,
+																 )::Vector{Dict{String,Vector}}
+
+
+	separate_boundary_modes(get_data, P, Elim, [target])
+
+end 
+
+
+function separate_boundary_modes(get_data::Function,
+																 P::AbstractDict,
+																 Elim::Tuple{Real,Real},
+																 target::AbstractVector{<:AbstractString},
+																 )::Vector{Dict{String,Vector}}
+
+	separate_boundary_modes(get_data(P,
+																	 mute=false, fromPlot=true,
+																	 target=union(target, ["Velocity","PH"])),
+													Elim, target)
+
+end 
+
+
+function separate_boundary_modes(Data::AbstractDict,
+																 Elim::AbstractVector{<:Real},
+																 args...)
+
+	separate_boundary_modes(Data, Tuple(Elim), args...)
+
+end  
+
+function separate_boundary_modes(Data::AbstractDict,
+																 Elim::Tuple{Real,Real},
+																 out_target_::AbstractVector{<:AbstractString}=setdiff(collect(keys(Data)),["kTicks"])
+																 )::Vector{Dict{String,Vector}}
+
+
+
+	@assert !isapprox(Elim..., atol=1e-4) "Energy window too small"
+
+	for key in ["kLabels", "Energy", "Velocity", "PH"]
+		
+		@assert haskey(Data, key)
+
+	end 
+
+	out_target = union(out_target_, ["kLabels", "Energy"])
+
 
 	v = myPlots.Transforms.choose_color_i(
 										Dict("obs_i"=>SECOND_DIM), 
@@ -232,52 +320,110 @@ function separate_boundary_modes(Data::AbstractDict,
 
 	# filter states with positive velocity 
 
-	x,y,v,ph = myPlots.Transforms.FilterStates(
-												Dict("filterstates"=>true,"opermin"=>0),
-												v, 
-												Data["kLabels"][:], 
-												Data["Energy"][:],
+	T3 = union(out_target, ["PH"])
+
+	T2 = setdiff(T3, ["Velocity"])
+
+	out = Dict(zip(["Velocity";T2], 
+								 myPlots.Transforms.FilterStates(
+												Dict("filterstates"=>true,"opermin"=>0), v, 
 												v,
-												Data["PH"][:],
-												)[1]
+												(Data[t][:] for t in T2)...
+												)[1]))
+
+
 	
 
 	# filter states in Elim (inside the gap) 
-	
-	@assert !isapprox(Elim..., atol=1e-4) "Energy window too small"
 
-	
 
-	x,y,v,ph = myPlots.Transforms.FilterStates(
+	out = Dict(zip(T3, myPlots.Transforms.FilterStates(
 												Dict("filterstates"=>true,
 														 "opermin"=>Elim[1],
 														 "opermax"=>Elim[2]),
-												y, 
-												x, y, v, ph)[1]
-
+											 out["Energy"], 
+											 (out[t] for t in T3)...
+											 )[1]))
 
 	# separate electron-/hole-like bands 
 	
-	return map(["opermin","opermax"]) do k
+	return map(["opermax","opermin"]) do k
 
-		 x1, y1, v1, ph1 = myPlots.Transforms.FilterStates(
-												Dict("filterstates"=>true,k=>0),
-												ph, x, y, v, ph)[1] 
+		out1 = Dict(zip(out_target, myPlots.Transforms.FilterStates(
+												Dict("filterstates"=>true,k=>0), out["PH"],
+												(out[t] for t in out_target)...)[1]))
 
-		 x2,i2 = Utils.Unique(x1, inds=:first, sorted=true) # assume spin degen.
+		# assume spin degen. -- otherwise separate spins beforehand 
+		
+		kLab, I = Utils.Unique(out1["kLabels"]; inds=:first, sorted=true)
 
-		 return [x2, y1[i2], v1[i2], ph1[i2]]
+		T4 = setdiff(out_target, ["kLabels"])
+
+		return Dict{String,Vector}("kLabels"=>kLab*2pi,
+															 (t=>collect(out1[t][I]) for t in T4)...)
 
 	end 
 
 
 end 
 
+function getprop_onFermiSurface(Data::AbstractDict,
+																Elim::Union{<:AbstractVector{<:Real},
+																						Tuple{Real,Real}},
+																E0::Float64, 
+																oper::AbstractString="kLabels",
+																)::Vector{Float64}
+
+	@assert Elim[1] < E0 < Elim[2]
 
 
+	map(separate_boundary_modes(Data, Elim, intersect([oper],keys(Data)))) do D 
+
+		dist = D["Energy"] .- E0
+
+		i_pos = dist.>0 
+
+		I = Utils.flatmap([identity,.!]) do f
+
+			local I = findall(f(i_pos))
+
+			n = min(6, length(I))
+
+			@assert n>=2
+
+			return partialsort(I, 1:n, by = i->abs(dist[i]))
+
+		end 
+		
+		sort!(I, by=i->dist[i])
 
 
+		function interp(x::String, y::String, val::Float64)::Float64
 
+			x_ = view(D[x], I)
+
+			@assert issorted(x_)
+
+			return Algebra.Interp1D(x_, view(D[y], I), 3, val)
+
+		end 
+		
+		
+		k0 = interp("Energy", "kLabels", E0)
+
+		if oper=="kLabels" || !haskey(Data, oper)
+
+			return k0 
+
+		else 
+		
+			return interp("kLabels", oper, k0)
+
+		end 
+
+	end
+
+end 
 
 
 
@@ -292,7 +438,7 @@ function RibbonBoundaryStates(init_dict::AbstractDict;
 #
 #---------------------------------------------------------------------------#
 
-	task = CompTask(Calculation("Ribbon DW States",
+	task = CompTask(Calculation("Ribbon DW States Dispersion",
 															Hamilt_Diagonaliz_Ribbon, init_dict;
 															operators=operators, kwargs...)) 
 
@@ -301,139 +447,156 @@ function RibbonBoundaryStates(init_dict::AbstractDict;
 
 	function plot(P::AbstractDict)
 
-		Data = task.get_data(P, mute=false, fromPlot=true, target=["Velocity","PH"])
-	
-
-		SCp = filter!(!isnothing, [get(P,string("SCp",c,"_magnitude"),nothing) for c in "xy"])
-
-		@assert !isempty(SCp) "No boundary modes without a gap"
-
-		E = sqrt(sum(abs2,SCp)/length(SCp))*(1.0-0.99get(P,"smooth",0))
-
-		E*=1.05  # => not sorted => test clean algo 
-
-		@assert !isapprox(E,0,atol=1e-5) "No boundary modes without a gap"
-		
-
-		states = separate_boundary_modes(Data, [-E,E])
-
-		xs,ys,vs,phs = Utils.zipmap(states) do item 
+		xs,ys = Utils.zipmap(separate_boundary_modes(task.get_data, P)) do D
 			
-			interps = myPlots.Transforms.interp.(item[1:1], item[2:end])
+			myPlots.Transforms.interp(D["kLabels"], D["Energy"])
 
-			Y = getindex.(interps,2)
+		end  
 
-			@assert all(isa.(Y,AbstractVector{<:Real}))
-
-			return (interps[1][1], Y...)
-
-		end 
-
-#		@assert haskey(P, "Energy") && -E<P["Energy"]<E
+		@assert all(isa.(ys,AbstractVector{<:Real}))
 
 
-map(states[1:1]) do item 
+	  return Dict(
 
-			k,e,v,ph = item 
-	
-#			E = E*0.8
+			 "xs"=>xs,
 
-#			inds = -E.<e.<E
+			 "ys"=>ys,
 
-#			k,e,v,ph = k[inds],e[inds],v[inds],ph[inds]
+			"xlabel" => "\$k_$sd\$",
 
-#			@assert issorted(e) "E interval too large" 
-	
-
-		@show issorted(e) 
-
-#		good_inds = falses(length(e))
-#
-#		i0 = div(length(e),2)
-#
-#		good[i0]=true 
-#
-#
-#
-#		for i in 0:i0-1 
-#
-#			for k in [i0-i-1, i0+i+1]
-#
-#				good[k] = e[k+1]>=e[k] 
-#
-#
-
-
-
-#			if e[i1-1]>e[i1] 
-#
-#
-#			bad_inds = findall(diff(e[good_inds]).<0)
-#
-#			@show bad_inds 
-#
-#			isempty(bad_inds) && break 
-#
-#			for i in bad_inds 
-#
-#				good_inds[i] = false 
-#
-#			end
-
-		end 
-
-
-
-
-
-
-		e[i+1] > e[i] 
-
-		diff[i]>=0 
-
-
-		@show diff(e) 
-#			k0 = Algebra.Interp1D(e, k, 3, P["Energy"])
-
-#			@show k0 
-
-		end 
-
-
-
-
-	  out = Dict(
-
-			 "xs"=>xs,#(xs..., xs..., xs...),
-
-			 "ys"=>ys,#(ys...,vs...,phs...),
-
-#			"z"=>v,
-	
-			"xlabel" => haskey(Data, "kTicks") ? "\$k_$sd\$" : "Eigenvalue index",
-#			"ylim" => [0, 1]*get(P,"saturation",1),
-
-
-#			"zlim"=> extrema(v),
-
-#			"zlabel" => "Velocity_$sd",
-
-"labels" => ["E","H"],#["E1","E2","V1","V2","PH1","PH2"],
+			"labels" => ["1","2"],
 
 			)
 
-		return out 
-
-
-
 	end 
 
-
-	return PlotTask(task, "Curves_Energy", plot,)
+	return PlotTask(task, "Curves_Energy", plot)
 
 end
 
 
+
+#===========================================================================#
+#
+function Ribbon_FermiSurface2_vsX(init_dict::AbstractDict;
+													operators::AbstractVector{<:AbstractString},
+													X::Symbol,
+													kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	md,sd = myPlots.main_secondary_dimensions()
+
+	task, out_dict, construct_Z, = ComputeTasks.init_multitask(
+						Calculation("Ribbon Fermi Surface 2", 
+												Hamilt_Diagonaliz_Ribbon, init_dict;
+												operators=operators, kwargs...),
+					 [X=>1],[2=>[1,2]],["State index"])
+ 
+
+	function plot(P::AbstractDict)::Dict
+
+		E = window_boundary_states(P)
+
+		@assert haskey(P, "Energy") 
+
+		oper = get(P, "oper", "")
+
+		function apply_rightaway(Data::AbstractDict, good_P
+														 )::Vector{Float64}
+			
+			print('\r',X," = ",good_P[1][X],"             ")
+
+			getprop_onFermiSurface(Data, (-E,E), P["Energy"], oper)
+
+		end 
+
+
+
+		ys = collect.(eachcol(construct_Z(P; apply_rightaway=apply_rightaway,
+																		 target=["PH","Velocity",oper])["z"]))
+
+		println("\r","                                       ")
+		
+		out = Dict("xs"=>[out_dict["x"],out_dict["x"]],
+
+								"ys"=>ys,
+
+								"labels"=>[1,2],
+
+								"xlabel"=>out_dict["xlabel"],
+
+								"ylabel"=>oper in operators ? oper : "\$k_$sd\$",
+
+								)
+
+		out["xlim"] = extrema(out["xs"][1])
+
+		haskey(P,string(X)) && setindex!(out, P[string(X)], "xline")
+
+		return out 
+
+	end 
+
+	return PlotTask(task, "Curves_yofx", plot) 
+
+end 
+
+
+#===========================================================================#
+#
+function Ribbon_deltaK_vsX_vsY(init_dict::AbstractDict;
+													operators::AbstractVector{<:AbstractString},
+													X::Symbol, Y::Symbol,
+													kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	@assert X!=Y 
+
+	md,sd = myPlots.main_secondary_dimensions()
+
+	task, out_dict, construct_Z, = ComputeTasks.init_multitask(
+						Calculation("Ribbon delta k", 
+												Hamilt_Diagonaliz_Ribbon, init_dict;
+												operators=operators, kwargs...),
+					 [X=>1,Y=>1])
+
+	merge!(out_dict, Dict(#"label"=> "",
+#												"xlim" => extrema(out_dict["x"]),
+#												"ylim" => extrema(out_dict["y"]),
+												"zlabel"=> "\$\\Delta k_$sd\$",
+												"zlim"=>[0,pi],
+												))
+
+	function plot(P::AbstractDict)::Dict
+
+		@assert haskey(P, "Energy")
+
+		E = window_boundary_states(P)
+
+		function apply_rightaway(Data::AbstractDict, good_P
+														 )::Float64
+			
+			print("\r($Y,$X) = (",good_P[1][Y],", ",good_P[1][X],")        ")
+
+			abs(only(diff(getprop_onFermiSurface(Data, (-E,E), P["Energy"]))))
+
+		end 
+
+		out = construct_Z(P; apply_rightaway=apply_rightaway,
+																		 target=["PH","Velocity"])
+
+		println("\r",repeat(" ",70))
+	
+		return merge!(out, out_dict)
+									
+	end  
+
+
+	return PlotTask(task, "Z_vsX_vsY", plot) 
+
+end 
 
 #===========================================================================#
 #

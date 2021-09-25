@@ -10,13 +10,16 @@ import myLibs:Parameters, Utils, ComputeTasks
 D = init(Device)
 
 tasks = [D.([
-#						 :RibbonSpectrum,
+						 :RibbonSpectrum,
+#						:RibbonBoundaryStates,
 #						:Ribbon_FermiSurface,
-						:RibbonBoundaryStates,
 						]);[
 #				D(:Ribbon_FermiSurface_vsX; X=:SCDW_phasediff),
-#				D(:Ribbon_FermiSurface_vsX; X=:Barrier_height),
+#				D(:Ribbon_FermiSurface2_vsX; X=:Barrier_height),
+				D(:Ribbon_deltaK_vsX_vsY; X=:SCDW_phasediff, Y=:Barrier_height),
 				]]
+
+
 
 for task in tasks
 
@@ -47,9 +50,9 @@ for task in tasks
 	
 	
 	add = ["Energy"=>0.06, "E_width"=>0.02, 
-				 "oper"=>"PH",
+#				 "oper"=>"PH",
 #				 "filterstates"=>true,
-#				 "oper"=>"Velocity", 
+				 "oper"=>"Velocity", 
 				 "opermin"=>0,# "opermax"=>10,
 				 "obs_i"=>2,
 				 "interp_method"=>:Rectangle,
@@ -79,10 +82,10 @@ end
 
 
 
-#ComputeTasks.missing_data(D(:RibbonSpectrum))
+ComputeTasks.missing_data(D(:RibbonSpectrum))
 
 
-#myPlots.plot(tasks...)
+myPlots.plot(tasks...)
 
 
 
