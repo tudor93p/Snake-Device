@@ -12,12 +12,13 @@ D = init(Device)
 
 tasks = [D.([
 						 :RibbonSpectrum,
-						:RibbonBoundaryStates,
+						:RibbonBoundaryStates, 
+						:Ribbon_deltaK_vsEnergy,
 #						:Ribbon_FermiSurface,
 						]);[
 #				D(:Ribbon_FermiSurface_vsX; X=:SCDW_phasediff),
 #				D(:Ribbon_FermiSurface2_vsX; X=:Barrier_height),
-				D(:Ribbon_deltaK_vsX_vsY; X=:SCDW_phasediff, Y=:Barrier_height),
+#				D(:Ribbon_deltaK_vsX_vsY; X=:SCDW_phasediff, Y=:Barrier_height),
 				]]
 
 

@@ -446,70 +446,125 @@ function separate_boundary_modes(Data::AbstractDict,
 
 end 
 
+function getprop_onFermiSurface(get_data::Function, P::AbstractDict,
+																Elim::Union{<:AbstractVector{<:Real},
+																						Tuple{Real,Real}},
+																E0::Union{Float64, AbstractVector{Float64}},
+																oper::AbstractString=get(P,"oper","kLabels")
+																)::Union{Vector{Float64},
+																				 Vector{Vector{Float64}}}
+
+	getprop_onFermiSurface(get_data(P, mute=false, fromPlot=true,
+																	target=union([oper], ["Velocity","PH"])),
+												 Elim, E0, oper)
+												
+end  
+
+
+function getprop_onFermiSurface(get_data::Function, P::AbstractDict,
+																Elim::Union{<:AbstractVector{<:Real},
+																						Tuple{Real,Real}},
+																oper::AbstractString,
+															)
+
+	getprop_onFermiSurface(get_data, P, Elim, 
+												 get(P, "Energy", sum(Elim)/2), oper)
+
+end  
+
+
+
+function getprop_onFermiSurface1(D::AbstractDict, 
+																 E0::Float64, 
+																 oper::AbstractString="kLabels"
+																 )::Float64
+
+	dist = D["Energy"] .- E0
+	
+
+	I1,I2 = map([<,>]) do f 
+
+		I = findall(f.(dist,0))
+
+		isempty(I) && @warn "No states above/below the desired E0=$E0"
+															 
+		return partialsort(I, 1:min(4, length(I)), by = i->abs(dist[i]))
+
+	end 
+	
+	if isempty(I1) | isempty(I2)
+		
+		@warn "Not enough data for interpolation. Returning 0."
+
+		return 0
+
+	end 
+
+
+	I = sort(union(I1,findall(isapprox.(dist,0,atol=1e-9)),I2), by=i->dist[i])
+
+
+	function interp(x::String, y::String, val::Float64)::Float64
+
+		x_ = view(D[x], I)
+
+		@assert issorted(x_)
+
+		return Algebra.Interp1D(x_, view(D[y], I), 3, val)
+
+	end 
+	
+	
+	k0 = interp("Energy", "kLabels", E0)
+
+	if oper=="kLabels" || !haskey(D, oper)
+
+		return k0 
+
+	else 
+	
+		return interp("kLabels", oper, k0)
+
+	end 
+
+end 
+
+
+
 function getprop_onFermiSurface(Data::AbstractDict,
 																Elim::Union{<:AbstractVector{<:Real},
 																						Tuple{Real,Real}},
 																E0::Float64, 
-																oper::AbstractString="kLabels",
+																oper...
 																)::Vector{Float64}
 
 	@assert Elim[1] < E0 < Elim[2]
 
+	map(separate_boundary_modes(Data, Elim, intersect(oper,keys(Data)))) do D 
 
-	map(separate_boundary_modes(Data, Elim, intersect([oper],keys(Data)))) do D 
-
-		dist = D["Energy"] .- E0
-		
-#		i_eq = findall(isapprox.(dist,0,atol=1e-8))
-#
-#
-#		i_pos = findall(dist.>0)
-#		i_neg = findall(dist.<=0) 
-
-		i_pos = dist.>0
-
-		I = Utils.flatmap([identity,.!]) do f
-
-			local I = findall(f(i_pos))
-
-			n = min(6, length(I))
-
-			@assert n>=2 "I has length $n"
-#			n>=2 || @warn 
-
-			return partialsort(I, 1:n, by = i->abs(dist[i]))
-
-		end 
-		
-		sort!(I, by=i->dist[i])
-
-
-		function interp(x::String, y::String, val::Float64)::Float64
-
-			x_ = view(D[x], I)
-
-			@assert issorted(x_)
-
-			return Algebra.Interp1D(x_, view(D[y], I), 3, val)
-
-		end 
-		
-		
-		k0 = interp("Energy", "kLabels", E0)
-
-		if oper=="kLabels" || !haskey(Data, oper)
-
-			return k0 
-
-		else 
-		
-			return interp("kLabels", oper, k0)
-
-		end 
+		getprop_onFermiSurface1(D, E0, oper...)
 
 	end
 
 end 
+
+function getprop_onFermiSurface(Data::AbstractDict,
+																Elim::Union{<:AbstractVector{<:Real},
+																						Tuple{Real,Real}},
+																E0s::AbstractVector{Float64}, 
+																oper...
+																)::Vector{Vector{Float64}}
+
+	@assert all(Elim[1] .< E0s .< Elim[2])
+
+	map(separate_boundary_modes(Data, Elim, intersect(oper,keys(Data)))) do D 
+
+		[getprop_onFermiSurface1(D, E0, oper...) for E0 in E0s]
+
+	end
+
+end 
+
 
 
 
@@ -560,6 +615,51 @@ function RibbonBoundaryStates(init_dict::AbstractDict;
 
 end
 
+
+#===========================================================================#
+#
+function Ribbon_deltaK_vsEnergy(init_dict::AbstractDict;
+									operators::AbstractVector{<:AbstractString}, 
+									kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	md,sd = myPlots.main_secondary_dimensions() 
+
+	task = CompTask(Calculation("Ribbon delta k$sd",
+															Hamilt_Diagonaliz_Ribbon, init_dict;
+															operators=operators, kwargs...)) 
+
+
+	function plot(P::AbstractDict)
+		
+		E = window_boundary_states(P)
+
+
+		E0 = ENERGIES[-E*0.95.<ENERGIES.<E*0.95]
+
+		ks = getprop_onFermiSurface(task.get_data, P, (-E,E), E0, "kLabels")
+
+
+	  return Dict(
+
+			"x"=> abs.(only(diff(ks))),
+
+			"xlim"=>[0,pi],
+
+			 "y"=>E0,
+
+			"xlabel" => "\$k_$sd\$",
+
+			"label" => "\$|\\Delta k_$sd|\$",
+
+			)
+
+	end 
+
+	return PlotTask(task, "Curves_Energy", plot)
+
+end
 
 
 #===========================================================================#
