@@ -332,11 +332,8 @@ function separate_boundary_modes(Data::AbstractDict,
 												)[1]))
 
 
-	
 
 	# filter states in Elim (inside the gap) 
-
-
 	out = Dict(zip(T3, myPlots.Transforms.FilterStates(
 												Dict("filterstates"=>true,
 														 "opermin"=>Elim[1],
@@ -345,24 +342,106 @@ function separate_boundary_modes(Data::AbstractDict,
 											 (out[t] for t in T3)...
 											 )[1]))
 
-	# separate electron-/hole-like bands 
-	
-	return map(["opermax","opermin"]) do k
 
-		out1 = Dict(zip(out_target, myPlots.Transforms.FilterStates(
-												Dict("filterstates"=>true,k=>0), out["PH"],
-												(out[t] for t in out_target)...)[1]))
+	#separate according to E1!=E2 or PH1>0>PH2
 
-		# assume spin degen. -- otherwise separate spins beforehand 
-		
-		kLab, I = Utils.Unique(out1["kLabels"]; inds=:first, sorted=true)
+	function update!(inds::BitMatrix,
+									 E::AbstractVector{Float64},
+									 PH::AbstractVector{Float64},
+									 i::Int)
+
+		for (pos,f) in enumerate((>,<))
+			
+			f(only(PH), 0) && return setindex!(inds, true, pos, i)
+
+		end 
+
+	end 
+
+
+	function update!(inds::BitMatrix,
+									 E::AbstractVector{Float64},
+									 PH::AbstractVector{Float64},
+									 i1::Int, i2::Int)
+
+		order = sortperm(isapprox(E..., atol=1e-8) ? reverse(PH) : E)
+
+		for (pos,i) in zip(order, [i1,i2])
+
+			inds[pos, i] = true 
+
+		end 
+
+	end 
+
+	function update!(inds::BitMatrix,
+									 E::AbstractVector{Float64},
+									 PH::AbstractVector{Float64},
+									 I::Vararg{Int,N}) where N
+
+		@assert N>2 "Wrong method" 
+
+		A = a,b = partialsortperm(E, 1:2)
+
+		update!(inds, E[A], PH[A], I[a], I[b])
+
+	end 
+
+
+	inds = falses(2,length(out["Energy"]))
+
+	for (k,i2) in Utils.EnumUnique(out["kLabels"])
+
+		@assert iseven(length(i2)) "No spin degeneracy?"
+
+		I = i2[1:2:end] # spin degeneracy 
+
+		update!(inds, out["Energy"][I], out["PH"][I], I...)
+
+	end 
+
+	@assert all(<(2), count(inds, dims=1))
+
+	return map(eachrow(inds)) do I1 
+
+		I = findall(I1)[sortperm(out["kLabels"][I1])]
 
 		T4 = setdiff(out_target, ["kLabels"])
 
-		return Dict{String,Vector}("kLabels"=>kLab*2pi,
-															 (t=>collect(out1[t][I]) for t in T4)...)
+		return Dict{String,Vector}("kLabels"=>out["kLabels"][I]*2pi,
+															 (t=>collect(out[t][I]) for t in T4)...)
 
 	end 
+
+
+#	# separate electron-/hole-like bands 
+#	
+#	map(["opermax","opermin"]) do k
+#
+#		out1 = Dict(zip(out_target, myPlots.Transforms.FilterStates(
+#												Dict("filterstates"=>true,k=>0), out["PH"],
+#												(out[t] for t in out_target)...)[1]))
+#
+#		# assume spin degen. -- otherwise separate spins beforehand 
+#		
+#		kLab, I = Utils.Unique(out1["kLabels"]; inds=:first, sorted=true)
+#
+#		T4 = setdiff(out_target, ["kLabels"])
+#
+##		K = sort(unique(round.(kLab, digits=2)))
+#
+##		for (i1,i2) in extrema.(Utils.IdentifySectors(isapprox.(diff(K),0.01)))
+#
+##			@show K[[i1,i2]]
+#
+##		end
+#
+#@show length(I) I[1:5]
+#
+#		return Dict{String,Vector}("kLabels"=>kLab*2pi,
+#															 (t=>collect(out1[t][I]) for t in T4)...)
+#
+#	end 
 
 
 end 
@@ -380,8 +459,14 @@ function getprop_onFermiSurface(Data::AbstractDict,
 	map(separate_boundary_modes(Data, Elim, intersect([oper],keys(Data)))) do D 
 
 		dist = D["Energy"] .- E0
+		
+#		i_eq = findall(isapprox.(dist,0,atol=1e-8))
+#
+#
+#		i_pos = findall(dist.>0)
+#		i_neg = findall(dist.<=0) 
 
-		i_pos = dist.>0 
+		i_pos = dist.>0
 
 		I = Utils.flatmap([identity,.!]) do f
 
@@ -389,7 +474,8 @@ function getprop_onFermiSurface(Data::AbstractDict,
 
 			n = min(6, length(I))
 
-			@assert n>=2
+			@assert n>=2 "I has length $n"
+#			n>=2 || @warn 
 
 			return partialsort(I, 1:n, by = i->abs(dist[i]))
 
