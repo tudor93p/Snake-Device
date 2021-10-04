@@ -3,11 +3,13 @@ module TasksPlots
 
 import myPlots
 
-import myLibs: Utils, ComputeTasks, Algebra
+import myLibs: Utils, ComputeTasks, Algebra, Parameters
 
 using myLibs.ComputeTasks: CompTask  
 using Helpers.Calculations: Calculation  
 using myPlots: PlotTask 
+
+import Helpers 
 
 using Constants: ENERGIES, NR_KPOINTS, SECOND_DIM
 
@@ -16,6 +18,8 @@ import ..Hamiltonian
 import ..LayeredLattice, ..RibbonLattice
 import ..GreensFcts
 import ..Hamilt_Diagonaliz, ..Hamilt_Diagonaliz_Ribbon
+import ..AndreevEq
+
 
 using ..Lattice.TasksPlots, ..LayeredLattice.TasksPlots
 using ..Hamiltonian.TasksPlots 
@@ -1032,6 +1036,132 @@ end
 
 
 
+
+#===========================================================================#
+#
+function RibbonAnalyticalModel(init_dict::AbstractDict;
+									kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	PF = Helpers.hParameters.ParamFlow(AndreevEq, init_dict)
+
+	task = CompTask(Parameters.Calculation("Model details", PF,
+																				 AndreevEq.analytical_functions;
+																				 kwargs...))
+
+
+	md,sd = myPlots.main_secondary_dimensions() 
+
+	function plot(P::AbstractDict)
+
+		fs = task.get_data(P, fromPlot=true, mute=true)
+
+		theta_y = Utils.Rescale(Ribbon_ks(), [-pi/2,pi/2])
+
+
+		ys,labels = Any[],String[]
+
+
+		theta_k = fs[:theta_k].(theta_y)
+
+		push!(ys,theta_k); push!(labels,"\$\\theta_k\$")
+
+
+
+		kF = fs[:FermiMomentum].(theta_k) 
+
+		push!(ys, getindex.(kF,1)); push!(labels, "\$k_x\$")
+		push!(ys, getindex.(kF,2)); push!(labels, "\$k_y\$")
+
+
+		e = fs[:Dispersion].(kF)
+
+		push!(ys, e); push!(labels, "E")
+
+		v = fs[:FermiVelocity].(kF)
+
+		push!(ys, getindex.(v,1)); push!(labels, "\$v_x\$")
+		push!(ys, getindex.(v,2)); push!(labels, "\$v_y\$")
+
+
+	  return Dict(
+
+						"xs"=> [theta_y/pi for y in ys],
+
+						"ys"=> ys,
+
+						"xlim"=> extrema(theta_y/pi),
+
+						"xlabel" => "\$\\theta_$sd/\\pi\$",
+		
+						"labels" => labels,
+			
+						)
+
+	end 
+
+	return PlotTask(task, "Curves_yofx", plot)
+
+end
+
+
+
+
+
+#===========================================================================#
+#
+function RibbonAndreevEq(init_dict::AbstractDict;
+									kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	task = CompTask(Calculation(AndreevEq, init_dict; kwargs...)) 
+
+
+	md,sd = myPlots.main_secondary_dimensions() 
+
+	function plot(P::AbstractDict)
+
+		Eb = task.get_data(P, fromPlot=true, mute=true)
+
+		theta_y = Utils.Rescale(Ribbon_ks(), [-pi/2,pi/2])
+
+		Eb1, Eb2, vx, vy = Utils.zipmap(Eb, theta_y) .|> collect
+
+		d = min(get(P,"obs_i",2),2)
+
+		x = repeat(theta_y/pi, outer=2)
+
+		y = vcat(Eb1, Eb2) 
+
+		z = repeat((vx,vy)[d], outer=2)
+		
+
+	  return Dict(
+
+						"x"=> x,
+
+						"y"=> y,
+
+						"z"=> z,
+
+						"xlim"=> extrema(x),
+
+						"xlabel" => "\$\\theta_$sd/\\pi\$",
+			
+						"zlim"=>[get(P,"opermin",minimum(z)), 
+										 get(P,"opermax",maximum(z))],
+
+						"zlabel" => string("\$v_","xy"[d],"\$"),
+			
+						)
+
+	end 
+
+	return PlotTask(task, "Scatter_vsEnergy", plot)
+
+end
 
 
 

@@ -64,6 +64,9 @@ include("Hamilt_Diagonaliz_Ribbon.jl")
 
 include("GreensFcts.jl")
 
+include("AndreevEq.jl")
+
+
 include("TasksPlots.jl")
 
 

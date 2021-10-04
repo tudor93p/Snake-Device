@@ -8,11 +8,18 @@ import myLibs:Parameters, Utils, ComputeTasks
 #PF = Helpers.hParameters.ParamFlow(H, input_args...)
 
 
-D = init(Device)
+D = init(Device) 
+
+myPlots.plot(D(:HParam))
+
+
+error()
 
 tasks = [D.([
+
 						 :RibbonSpectrum,
-						:RibbonBoundaryStates, 
+						 :HParam,
+#						:RibbonBoundaryStates, 
 						:Ribbon_deltaK_vsEnergy,
 #						:Ribbon_FermiSurface,
 						]);[
