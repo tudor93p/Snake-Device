@@ -1,6 +1,8 @@
 module TasksPlots
 #############################################################################
 
+import LinearAlgebra 
+
 import myPlots
 
 import myLibs: Utils, ComputeTasks, Algebra, Parameters
@@ -1075,6 +1077,7 @@ function RibbonAnalyticalModel(init_dict::AbstractDict;
 		push!(ys, getindex.(kF,2)); push!(labels, "\$k_y\$")
 
 
+
 		e = fs[:Dispersion].(kF)
 
 		push!(ys, e); push!(labels, "E")
@@ -1083,19 +1086,36 @@ function RibbonAnalyticalModel(init_dict::AbstractDict;
 
 		push!(ys, getindex.(v,1)); push!(labels, "\$v_x\$")
 		push!(ys, getindex.(v,2)); push!(labels, "\$v_y\$")
+	
+		push!(ys, LinearAlgebra.norm.(v)); push!(labels, "\$v\$")
+
+
+		theta_v = atan.(getindex.(v,2),getindex.(v,1))
+
+		push!(ys, theta_v); push!(labels, "\$\\theta_v\$")
+
+		xm,xM = extrema(theta_y/pi)
+
+		x_ylim = [xM,xM+1e-8]
+
+		ylim = [minimum(minimum, ys), maximum(maximum, ys)]
+
+
 
 
 	  return Dict(
 
-						"xs"=> [theta_y/pi for y in ys],
+						"xs"=> vcat([theta_y/pi for y in ys], [x_ylim]),
 
-						"ys"=> ys,
+						"ys"=> vcat(ys, [ylim]),
 
-						"xlim"=> extrema(theta_y/pi),
+						"ylim" => ylim,
+
+						"xlim"=> [xm, xM + 0.25*(xM-xm)],
 
 						"xlabel" => "\$\\theta_$sd/\\pi\$",
 		
-						"labels" => labels,
+						"labels" => vcat(labels, ""),
 			
 						)
 
@@ -1127,16 +1147,24 @@ function RibbonAndreevEq(init_dict::AbstractDict;
 
 		theta_y = Utils.Rescale(Ribbon_ks(), [-pi/2,pi/2])
 
-		Eb1, Eb2, vx, vy = Utils.zipmap(Eb, theta_y) .|> collect
+		Eb1, Eb2, vx, vy, kx, ky = Utils.zipmap(Eb, theta_y) .|> collect
 
 		d = min(get(P,"obs_i",2),2)
 
-		x = repeat(theta_y/pi, outer=2)
+		x = vcat((theta_y/pi for i=1:2)...)
 
 		y = vcat(Eb1, Eb2) 
 
-		z = repeat((vx,vy)[d], outer=2)
+#		z = vcat(((vx,vy)[d]*ph for ph in (-1,1))...)
 		
+		dkdt = diff((kx,ky)[d])
+		
+		v1,v2 = (diff(e)./dkdt for e in (Eb1,Eb2))
+
+		z = vcat(v1, v1[end], v2, v2[end])
+
+
+
 
 	  return Dict(
 

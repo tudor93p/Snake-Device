@@ -7,10 +7,10 @@ import Device
 #include("h.jl")
 
 
-#pr_in("gf")
+pr_in("gf")
 
 
-#pr_in("plot") 
+pr_in("plot") 
 
 
 #pr_in("ribbon")
@@ -18,7 +18,7 @@ import Device
 #pr_in("ribbon_FS")
 
 
-pr_in("analytical")
+#pr_in("analytical")
 
 
 

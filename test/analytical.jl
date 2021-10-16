@@ -11,7 +11,10 @@ import myPlots
 P = Dict(:SCpx_magnitude=>0.4,:SCpy_magnitude=>0.4)
 
 
-P2 = merge(P, Dict( :Barrier_height=>20,
+P2 = merge(P, Dict( 
+									 	:Barrier_height=>0.001, 
+										:Barrier_width=>0.03,
+									 	:SCDW_p=>2, :length=>85,
 									  :SCDW_phasediff=>0.0pi))
 
 
@@ -146,6 +149,7 @@ theta_y = range(-pi/2, pi/2, length=200)
 
 Ebs = Eb.(theta_y) 
 
+
 for i=1:2
 
 	#ax2.scatter(theta_y/pi, getindex.(Ebs,i),c="b",s=10)
@@ -167,12 +171,16 @@ for p in t.get_paramcombs()
 
 		println(k," ",typeof(v)," ",length(v))
 
-
 	end 
+
+	@show length.(d["xs"])
+	@show length.(d["ys"])
 
 	break 
 
 end 
+
+error()
 
 myPlots.plot(D.([:RibbonAndreevEq,
 								 :RibbonAnalyticalModel,

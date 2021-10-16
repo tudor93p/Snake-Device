@@ -32,7 +32,9 @@ P = rand(Parameters.get_paramcombs(PF))[1]
 @show P 
 @show PF.get_fname(P)()
 
-Calculation(LayeredLattice, input_args[1]).Compute(P)
+
+
+Calculation(LayeredLattice, input_args[1]).Compute(P) #weird printing
 
 
 
@@ -45,6 +47,7 @@ observables = Helpers.ObservableNames.construct_ObsNames("DOS","LocalDOS")
 
 C = Calculation(Device.GreensFcts, input_args[1]; observables=observables)
 
+println("Computing GF obs")
 
 for (k,v) in  C.Compute(P) 
 
