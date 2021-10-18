@@ -34,6 +34,7 @@ function Compute(dev_params::UODict;
 																			 Hamiltonian.HParam(dev_params),
 																			 get_target(; kwargs...),
 																			 get_fname(dev_params),
+																			 calc_kPath=false,
 																			 )
 end 
 
