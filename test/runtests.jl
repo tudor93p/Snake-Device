@@ -7,7 +7,7 @@ import Device
 #include("h.jl")
 
 
-pr_in("gf")
+#pr_in("gf")
 
 
 pr_in("plot") 

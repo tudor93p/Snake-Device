@@ -23,7 +23,6 @@ for P in task.get_paramcombs()
 end 
 
 
-error()
 PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, true)[1][1])
 
 #@show rand(Parameters.get_paramcombs(PF))[1]
@@ -32,9 +31,9 @@ PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, tru
 tasks = D.([
 						:HParam,
 #						:Latt,
-						:LocalObservables,
+#						:LocalObservables,
 #						:LocalObservablesCut,
-						:Observables,
+#						:Observables,
 						:Spectrum,
 						])
 
@@ -65,24 +64,37 @@ println()
 
 #ComputeTasks.get_data_one(task, mute=false)
 	
-for L in input_Device[:allparams][:length][1:2]
-	
+for LENGTH in [4]#input_Device[:allparams][:length][1:1]
+
 h = first(input_Device[:allparams][:Barrier_height]) 
 
-phi = input_Device[:allparams][:SCDW_phasediff][1]
+#phi = input_Device[:allparams][:SCDW_phasediff][1]
 
-P = (length = L, Barrier_height = h, Barrier_width = 0.03, SCDW_p = 2, SCDW_width = 0.005, SCDW_position = 0, SCpx_magnitude = 0.4, delta = 0.002, width = div(L,2), SCpy_magnitude = 0.4, SCDW_phasediff = phi)
 
-l = div(div(L,2),2)
+P = (length = LENGTH, Barrier_height = h, Barrier_width = 0.03, SCDW_phasediff = 0., SCDW_p = 2, SCDW_width = 0.005, SCDW_position = 0, SCpx_magnitude = 0.4, delta = 0.002, width = div(LENGTH,2), SCpy_magnitude = 0.4, Hopping=1.0, ChemicalPotential=2.0)
+
+
+l = Int(round(P.width/2))
 
 println() 
 
-@show L h phi 
+#@show L h phi 
+
 
 
 plot_P = merge(OrderedDict(string(k)=>v for (k,v) in pairs(P)),
 							 OrderedDict( "Attached_Leads" => "AB", "Lead_Coupling" => 1.0, "Lead_Width" => 0.5, "A__ChemPot" => 0.0, "A__Hopping" => 1.0, "A__Label" => "A", "A__Direction" => -1, "A__Contact" => (-1, 1), "A__Lead_Width" => l, "A__Lead_Coupling" => 1.0, "A__SCbasis" => true, "B__ChemPot" => 0.0, "B__Hopping" => 1.0, "B__Label" => "B", "B__Direction" => 1, "B__Contact" => (1, -1), "B__Lead_Width" => l, "B__Lead_Coupling" => 1.0, "B__SCbasis" => true)
 							)
+
+
+println(P)
+
+for lead in plot_P["Attached_Leads"]
+
+	println(NamedTuple(Symbol(split(k,"__")[end])=>v for (k,v) in plot_P if occursin("$(lead)__",k)))
+
+end 
+
 
 for task in tasks 
 
@@ -99,6 +111,11 @@ add = ["Energy"=>0.157,"vec2scalar"=>"x","region"=>5, "obs_i"=>1,
 #				 "transform"=>"|Fourier|",
 				 ]
 
+
+	task.get_data(P, force_comp=true)
+
+	break 
+
 	out_dict = task.plot(Utils.adapt_merge(plot_P, add))
 														
 	println()
@@ -108,7 +125,26 @@ add = ["Energy"=>0.157,"vec2scalar"=>"x","region"=>5, "obs_i"=>1,
 
 		print(k)
 
-		isnothing(v) || print("\t",(v isa String ? (v,) : (length(v)," ",typeof(v)))...)
+		isnothing(v) && continue 
+		
+		
+		print("\t",typeof(v),"\t")
+		
+		if v isa String 
+			
+			print(v)
+		
+		elseif v isa AbstractArray 
+			
+			print(size(v))
+			
+			eltype(v)<:Real && print(extrema(v))
+
+		elseif v isa AbstractDict 
+			
+			print(length(v),keys(v))
+
+		end 
 
 		println()
 

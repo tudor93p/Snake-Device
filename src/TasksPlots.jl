@@ -183,7 +183,6 @@ function Spectrum(init_dict::AbstractDict;
 	task = CompTask(Calculation(Hamilt_Diagonaliz, init_dict;
 															operators=setdiff(operators, ["Velocity"]),
 															kwargs...))
-
 	return PlotTask(task, 
 									[(:oper, operators), (:enlim, [-4,4])],
 									myPlots.TypicalPlots.oper(task))
