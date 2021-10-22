@@ -10,10 +10,10 @@ import ..Lattice, ..Hamiltonian
 
 Dependencies = [Lattice, Hamiltonian] 
 
-import myLibs: Lattices, TBmodel, Utils, BandStructure
-using Constants: HOPP_CUTOFF, VECTOR_STORE_DIM, FILE_STORE_METHOD
+#import myLibs: Lattices, TBmodel, Utils, BandStructure
+#using Constants: HOPP_CUTOFF, VECTOR_STORE_DIM, FILE_STORE_METHOD
 
-import SparseArrays
+#import SparseArrays
 
 #===========================================================================#
 #
