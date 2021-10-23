@@ -46,7 +46,8 @@ function Compute(dev_params::UODict; get_fname::Function, kwargs...
 						 LayeredLattice.NewGeometry(dev_params; Hopping...)...;
 #						 Lattice_fname=Lattice_fname,
 #						 plot_graphs=false,
-						 delta=dev_params[:delta]
+						 delta=dev_params[:delta],
+						 kwargs...
 						 )
 						
 end 
