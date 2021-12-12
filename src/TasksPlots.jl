@@ -201,6 +201,8 @@ function RibbonSpectrum(init_dict::AbstractDict;
 	task = CompTask(Calculation(Hamilt_Diagonaliz_Ribbon, init_dict;
 															operators=operators, kwargs...)) 
 
+
+
 	return PlotTask(task, 
 									[(:oper, operators), (:enlim, [-4,4])],
 									myPlots.TypicalPlots.oper(task)
@@ -790,7 +792,6 @@ function RibbonLocalOper(init_dict::AbstractDict;
 #---------------------------------------------------------------------------#
 
 	pt0 = RibbonSpectrum(init_dict; operators=operators, kwargs...)
-
 
 	return PlotTask(pt0, (:localobs, operators),
 									myPlots.TypicalPlots.localobs(pt0, RibbonLattice)...)

@@ -4,21 +4,35 @@ include("$PATH_SNAKE/input_file.jl")
 
 import Device 
 
-#include("h.jl")
 
 
-#pr_in("gf")
+for f in (
+#
+#"h",
+#
+#"gf",
+#
+#"gf+leads",
 
 
-pr_in("plot") 
-
-
-#pr_in("ribbon")
+#"ribbon",
+#"plot",
 
 #pr_in("ribbon_FS")
 
 
 #pr_in("analytical")
+
+
+
+
+)
+
+	println("\n********* $f ********* \n")
+
+	include("$f.jl")
+
+end
 
 
 

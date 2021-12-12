@@ -30,15 +30,17 @@ function Compute(dev_params::UODict;
 								 dim::Int=0, 
 								 target=nothing, 
 								 get_fname::Function,
+								 calc_kPath::Bool=false,
 								 kwargs...
 								 )::Dict 
 
+#	@show Lattice.Latt(dev_params; dim=dim) Hamiltonian.HParam(dev_params) get_target(; kwargs...) get_fname(dev_params) 
 
 	out = Helpers.Calculations.ComputeSpectrum(Lattice.Latt(dev_params; dim=dim),
 																			 Hamiltonian.HParam(dev_params),
 																			 get_target(; kwargs...),
 																			 get_fname(dev_params);
-																			 calc_kPath=false,
+																			 calc_kPath=calc_kPath,#false,
 																			 )
 
 #

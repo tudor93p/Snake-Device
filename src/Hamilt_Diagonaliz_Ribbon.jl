@@ -76,7 +76,10 @@ end
 
 function Compute(dev_params::UODict; dim=nothing, kwargs...)::Dict 
 
-	Hamilt_Diagonaliz.Compute(dev_params; dim=1, kwargs...) 
+	Hamilt_Diagonaliz.Compute(dev_params; 
+														dim=1, 
+														calc_kPath=true,
+														kwargs...) 
 
 end 
 

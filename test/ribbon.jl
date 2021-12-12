@@ -29,13 +29,22 @@ for P in filter(x->x[1][:length]==10,allcombs)[1:1]
 
 #	out = H.Compute(P...; get_fname=PF.get_fname)
 #	@show keys(out)
-	out = H.Compute(P...; get_fname=PF.get_fname, input_kwargs...)
+
+	out = H.Compute(P...; get_fname=PF.get_fname, input_kwargs...) 
+
 
 	@show keys(out)
 
 
 
 	@show size(out["kLabels"])
+
+	L = length(unique(out["kLabels"]))
+
+	@assert L>2 L 
+	@show L 
+
+
 	@show size(out["Energy"])
 	@show out["kTicks"]
 
@@ -52,8 +61,16 @@ for P in filter(x->x[1][:length]==10,allcombs)[1:1]
 	@assert keys(out)==keys(out2)  
 
 	for (k,v) in pairs(out)
-	
-		@assert isapprox(v,out2[k])
+
+		if v isa AbstractString 
+
+			@assert v==out2[k]
+
+		else 
+
+			@assert isapprox(v,out2[k])
+
+		end
 
 	end 
 
@@ -68,6 +85,8 @@ for P in filter(x->x[1][:length]==10,allcombs)[1:1]
 
 
 end  
+
+#error() 
 
 println()
 println()
@@ -86,7 +105,9 @@ P = task.get_paramcombs()[1][1]
 
 for (k,v) in pairs(task.get_data(P; fromPlot=false, target="QP-LocalDOS"))
 
-	@show k size(v)
+	@show k 
+	
+	len_or_size = v isa AbstractString ? length : size 
 
 	println()
 

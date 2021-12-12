@@ -30,10 +30,10 @@ PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, tru
 
 tasks = D.([
 						:HParam,
-#						:Latt,
-#						:LocalObservables,
-#						:LocalObservablesCut,
-#						:Observables,
+						:Latt,
+						:LocalObservables,
+						:LocalObservablesCut,
+					:Observables,
 						:Spectrum,
 						])
 
