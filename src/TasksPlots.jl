@@ -400,9 +400,8 @@ function separate_boundary_modes(Data::AbstractDict,
 
 	for (k,i2) in Utils.EnumUnique(out["kLabels"])
 
-		@assert iseven(length(i2)) "No spin degeneracy?"
-
-		I = i2[1:2:end] # spin degeneracy 
+		I = iseven(length(i2)) ? i2[1:2:end] : i2 
+		# rmv spin degeneracy 
 
 		update!(inds, out["Energy"][I], out["PH"][I], I...)
 
