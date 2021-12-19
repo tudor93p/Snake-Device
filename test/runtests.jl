@@ -12,10 +12,9 @@ for f in (
 #
 #"gf",
 #
-#"gf+leads",
 
 
-#"ribbon",
+"ribbon",
 #"plot",
 
 #pr_in("ribbon_FS")

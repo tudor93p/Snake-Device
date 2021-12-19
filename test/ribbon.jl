@@ -41,8 +41,9 @@ for P in filter(x->x[1][:length]==10,allcombs)[1:1]
 
 	L = length(unique(out["kLabels"]))
 
+	@show length(unique(out["kLabels"]))
+
 	@assert L>2 L 
-	@show L 
 
 
 	@show size(out["Energy"])
@@ -109,6 +110,8 @@ for (k,v) in pairs(task.get_data(P; fromPlot=false, target="QP-LocalDOS"))
 	
 	len_or_size = v isa AbstractString ? length : size 
 
+	@show len_or_size 
+
 	println()
 
 end 
@@ -121,14 +124,18 @@ println()
 
 
 
-tasks = [init(Device, :RibbonSpectrum),
+tasks = [
+#				 init(Device, :Ribbon_deltaK_vsEnergy),
 				 init(Device, :HParam),
-				 init(Device, :RibbonLocalOper)
+				 init(Device, :RibbonSpectrum),
+#				 init(Device, :RibbonBoundaryStates),
+#				 init(Device, :RibbonLocalOper),
+				 init(Device, :Ribbon_deltaK_vsX_vsY; X=:SCDW_phasediff, Y=:Barrier_height)
 				 ]
 
 ComputeTasks.missing_data(tasks[1])
 
-myPlots.plot(tasks, insets=Dict(1=>3))
+myPlots.plot(tasks)#, insets=Dict(1=>3))
 
 #ComputeTasks.get_data_all(task, mute=true)
 

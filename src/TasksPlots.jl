@@ -316,14 +316,17 @@ function separate_boundary_modes(Data::AbstractDict,
 		
 		@assert haskey(Data, key)
 
+
 	end 
 
 	out_target = union(out_target_, ["kLabels", "Energy"])
 
 
+
 	v = myPlots.Transforms.choose_color_i(
 										Dict("obs_i"=>SECOND_DIM), 
 										Data["Velocity"])[1]
+
 
 
 	# filter states with positive velocity 
@@ -339,8 +342,6 @@ function separate_boundary_modes(Data::AbstractDict,
 												(Data[t][:] for t in T2)...
 												)[1]))
 
-
-
 	# filter states in Elim (inside the gap) 
 	out = Dict(zip(T3, myPlots.Transforms.FilterStates(
 												Dict("filterstates"=>true,
@@ -349,6 +350,7 @@ function separate_boundary_modes(Data::AbstractDict,
 											 out["Energy"], 
 											 (out[t] for t in T3)...
 											 )[1]))
+
 
 
 	#separate according to E1!=E2 or PH1>0>PH2
@@ -387,7 +389,7 @@ function separate_boundary_modes(Data::AbstractDict,
 									 PH::AbstractVector{Float64},
 									 I::Vararg{Int,N}) where N
 
-		@assert N>2 "Wrong method" 
+		@assert N>2 "Wrong method, spin degeneracy removed?" 
 
 		A = a,b = partialsortperm(E, 1:2)
 
@@ -398,14 +400,17 @@ function separate_boundary_modes(Data::AbstractDict,
 
 	inds = falses(2,length(out["Energy"]))
 
-	for (k,i2) in Utils.EnumUnique(out["kLabels"])
 
-		I = iseven(length(i2)) ? i2[1:2:end] : i2 
+#	for (k,i2) in Utils.EnumUnique(out["kLabels"])
+	for (k,I) in Utils.EnumUnique(out["kLabels"])
+
+#		I = iseven(length(i2)) ? i2[1:2:end] : i2 
 		# rmv spin degeneracy 
 
 		update!(inds, out["Energy"][I], out["PH"][I], I...)
 
 	end 
+
 
 	@assert all(<(2), count(inds, dims=1))
 
@@ -488,7 +493,6 @@ function getprop_onFermiSurface1(D::AbstractDict,
 
 	dist = D["Energy"] .- E0
 	
-
 	I1,I2 = map([<,>]) do f 
 
 		I = findall(f.(dist,0))
