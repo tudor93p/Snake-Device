@@ -14,13 +14,8 @@ for f in (
 #
 
 
-"ribbon",
 #"plot",
 
-#pr_in("ribbon_FS")
-
-
-#pr_in("analytical")
 
 
 
