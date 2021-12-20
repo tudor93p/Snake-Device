@@ -7,14 +7,14 @@ import Device
 
 
 for f in (
-#
+
 #"h",
-#
+
 #"gf",
-#
 
 
-#"plot",
+
+"plot",
 
 
 
