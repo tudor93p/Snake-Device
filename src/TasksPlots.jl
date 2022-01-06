@@ -20,7 +20,7 @@ import ..Hamiltonian
 import ..LayeredLattice
 import ..GreensFcts
 import ..Hamilt_Diagonaliz
-import ..AndreevEq
+#import ..AndreevEq
 
 
 using ..Lattice.TasksPlots, ..LayeredLattice.TasksPlots
@@ -59,11 +59,10 @@ function Observables(init_dict::AbstractDict;
 	task = CompTask(Calculation(GreensFcts, init_dict; 
 															observables=observables, kwargs...))
 
-	init_sliders = [myPlots.Sliders.init_obs(observables),
-									myPlots.Sliders.init_enlim(ENERGIES)
-									]
 		
-	return PlotTask(task, init_sliders, myPlots.TypicalPlots.obs(task))
+	return PlotTask(task, 
+									[(:obs, observables), (:enlim, ENERGIES)],
+									myPlots.TypicalPlots.obs(task))
 
 end
 
