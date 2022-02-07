@@ -9,18 +9,18 @@ using BenchmarkTools
 
 D = init(Device, true)
 
-task = D(:LayeredPosAtoms)
-
-for P in task.get_paramcombs()
-
-	println(P[1][:length])
-
-	task.get_data(P..., mute=true)#false) 
-	@time task.get_data(P..., mute=true)#false) 
-
-	println()
-
-end 
+#task = D(:LayeredPosAtoms)
+#
+#for P in task.get_paramcombs()
+#
+#	println(P[1][:length])
+#
+#	task.get_data(P..., mute=true)#false) 
+#	@time task.get_data(P..., mute=true)#false) 
+#
+#	println()
+#
+#end 
 
 
 PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, true)[1][1])
@@ -30,7 +30,7 @@ PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, tru
 
 tasks = D.([
 						:HParam,
-						:Latt,
+#						:Latt,
 #						:LocalObservables,
 #						:LocalObservablesCut,
 					:Observables,
@@ -64,7 +64,7 @@ println()
 
 #ComputeTasks.get_data_one(task, mute=false)
 	
-for LENGTH in [4]#input_Device[:allparams][:length][1:1]
+for LENGTH in [10]#input_Device[:allparams][:length][1:1]
 
 h = first(input_Device[:allparams][:Barrier_height]) 
 
@@ -157,11 +157,9 @@ end
 
 #ComputeTasks.get_data_all(task, check_data=true, mute=false)
 
+ComputeTasks.missing_data.(tasks)
 
-myPlots.plot(tasks)#, only_prep=true)#; insets=insets)
-
-
-
+#myPlots.plot(tasks)#, only_prep=true)#; insets=insets)
 
 
 
