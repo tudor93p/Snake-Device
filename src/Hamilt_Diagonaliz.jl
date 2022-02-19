@@ -37,7 +37,8 @@ function Compute(dev_params::UODict;
 
 #	@show Lattice.Latt(dev_params; dim=dim) Hamiltonian.HParam(dev_params) get_target(; kwargs...) get_fname(dev_params) 
 
-	out = Helpers.Calculations.ComputeSpectrum(Lattice.Latt(dev_params; dim=dim),
+	out = Helpers.Calculations.ComputeSpectrum(
+																						 Lattice.Latt(dev_params; dim=dim),
 																			 Hamiltonian.HParam(dev_params),
 																			 get_target(; kwargs...),
 																			 get_fname(dev_params);
