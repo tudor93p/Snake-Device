@@ -5,8 +5,7 @@ include("$PATH_SNAKE/input_file.jl")
 import Device 
 
 
-
-for f in (
+foreach(pr_in, (
 
 #"h",
 
@@ -21,13 +20,7 @@ for f in (
 
 
 
-)
-
-	println("\n********* $f ********* \n")
-
-	include("$f.jl")
-
-end
+))
 
 
 
