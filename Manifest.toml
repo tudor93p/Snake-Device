@@ -35,9 +35,9 @@ version = "3.5.0+3"
 
 [[ArrayInterface]]
 deps = ["Compat", "IfElse", "LinearAlgebra", "Requires", "SparseArrays", "Static"]
-git-tree-sha1 = "6e8fada11bb015ecf9263f64b156f98b546918c7"
+git-tree-sha1 = "8d4a07999261b4461daae67b2d1e12ae1a097741"
 uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "5.0.5"
+version = "5.0.6"
 
 [[Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -410,15 +410,15 @@ uuid = "781609d7-10c4-51f6-84f2-b8444358ff6d"
 
 [[GR]]
 deps = ["Base64", "DelimitedFiles", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Pkg", "Printf", "Random", "RelocatableFolders", "Serialization", "Sockets", "Test", "UUIDs"]
-git-tree-sha1 = "df5f5b0450c489fe6ed59a6c0a9804159c22684d"
+git-tree-sha1 = "af237c08bda486b74318c8070adb96efa6952530"
 uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
-version = "0.64.1"
+version = "0.64.2"
 
 [[GR_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "GLFW_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pixman_jll", "Pkg", "Qt5Base_jll", "Zlib_jll", "libpng_jll"]
-git-tree-sha1 = "83578392343a7885147726712523c39edc714956"
+git-tree-sha1 = "cd6efcf9dc746b06709df14e462f0a3fe0786b1e"
 uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
-version = "0.64.1+0"
+version = "0.64.2+0"
 
 [[GenericLinearAlgebra]]
 deps = ["LinearAlgebra", "Printf", "Random"]
@@ -469,9 +469,9 @@ version = "0.1.0"
 
 [[HDF5]]
 deps = ["Compat", "HDF5_jll", "Libdl", "Mmap", "Random", "Requires"]
-git-tree-sha1 = "1ffca8635410d35aed33facc7840fee647e18b55"
+git-tree-sha1 = "cdd249512de03cbf8370365a0a08b9a24955dca9"
 uuid = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
-version = "0.16.5"
+version = "0.16.6"
 
 [[HDF5_jll]]
 deps = ["Artifacts", "JLLWrappers", "LibCURL_jll", "Libdl", "OpenSSL_jll", "Pkg", "Zlib_jll"]
@@ -493,7 +493,7 @@ version = "2.8.1+1"
 
 [[Helpers]]
 deps = ["Constants", "Distributed", "LinearAlgebra", "OrderedCollections", "PyCall", "PyPlot", "Revise", "Test", "myLibs"]
-git-tree-sha1 = "80eb08bb1fc62b56b7009fe5ef3bc8bfe1f830a9"
+git-tree-sha1 = "9c808e754302d583c9d1373f482aa99de42f9907"
 repo-rev = "main"
 repo-url = "../../Helpers"
 uuid = "fd2d3303-ab2f-4175-b0e0-24add640a121"
@@ -902,9 +902,9 @@ version = "0.12.3"
 
 [[Parsers]]
 deps = ["Dates"]
-git-tree-sha1 = "85b5da0fa43588c75bb1ff986493443f821c70b7"
+git-tree-sha1 = "621f4f3b4977325b9128d5fae7a8b4829a0c2222"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.2.3"
+version = "2.2.4"
 
 [[Pixman_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1196,9 +1196,9 @@ version = "3.4.2"
 
 [[TimeZones]]
 deps = ["Dates", "Downloads", "InlineStrings", "LazyArtifacts", "Mocking", "Printf", "RecipesBase", "Serialization", "Unicode"]
-git-tree-sha1 = "2d4b6de8676b34525ac518de36006dc2e89c7e2e"
+git-tree-sha1 = "0a359b0ee27e4fbc90d9b3da1f48ddc6f98a0c9e"
 uuid = "f269a46b-ccf7-5d73-abea-4c690281aa53"
-version = "1.7.2"
+version = "1.7.3"
 
 [[TranscodingStreams]]
 deps = ["Random", "Test"]

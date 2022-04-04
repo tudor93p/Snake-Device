@@ -4,6 +4,7 @@ authors = ["tudor <tudor.pahomi@gmail.com>"]
 version = "0.1.1"
 
 [deps]
+Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 Constants = "26e1ccdb-dc7d-4967-a216-0e9bd72dc499"
 Helpers = "fd2d3303-ab2f-4175-b0e0-24add640a121"
 IntervalRootFinding = "d2bf35a9-74e0-55ec-b149-d360ff49b807"

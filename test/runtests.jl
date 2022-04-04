@@ -5,22 +5,22 @@ include("$PATH_SNAKE/input_file.jl")
 import Device 
 
 
-foreach(pr_in, (
+foreach(pr_in, [
 
 #"h",
 
 #"gf",
 
+"Ginzburg_Landau"
 
-
-"plot",
+#"plot",
 
 
 #bulk
 
 
 
-))
+])
 
 
 

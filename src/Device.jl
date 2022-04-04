@@ -30,6 +30,7 @@ export Hamiltonian
 
 
 include("Hamilt_Diagonaliz.jl") 
+include("GinzburgLandau.jl")
 
 include("GreensFcts.jl")
 
