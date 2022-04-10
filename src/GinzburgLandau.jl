@@ -5,6 +5,8 @@ import LinearAlgebra, Combinatorics, QuadGK
 
 import myLibs: Utils 
 
+using OrderedCollections: OrderedDict 
+
 using myLibs.Parameters: UODict  
 
 import Helpers 
@@ -14,9 +16,17 @@ import ..Lattice, ..Hamiltonian
 
 other = Dict(1=>2,2=>1)
 
-rep(i::Int)::NTuple{2,Int} = (i,i)
-rep(t::NTuple{2,Int})::Vector{NTuple{2,Int}} = [t,t]
-rep(i::Int,j::Int)::Vector{NTuple{2,Int}} = rep((i,j)) 
+function rep(q::T)::NTuple{2,T} where T  
+
+	(q,q)
+
+end 
+
+function rep(a::Ta,b::Tb)::NTuple{2,Tuple{Ta,Tb}} where {Ta,Tb} 
+	
+	rep((a,b))
+
+end 
 
 #()::Vector{Vector{NTuple{2,Int}}}
 D4h_homog_ord2 = [ (1,[(1,1),(2,2)]) ] 
@@ -40,6 +50,426 @@ D4h_grad_ord2 = [
 	 (1,[rep(3,i) for i=1:2])
 	]
 
+
+
+
+
+
+
+
+
+
+#function GL_TermInds(#energy_class::Int,
+#														 weight::Float64,
+#														 ind1::AbstractVector{Int},
+#														 indsets::Vararg{<:AbstractVector{Int}}
+#														 )::GL_TermInds 
+#
+#	GL_TermInds(1, weight, ind1, indsets...)
+#
+#end 
+#
+#function GL_TermInds(#energy_class::Int,
+#														 weight::Float64,
+#														 ind1::Int,
+#														 indsets::Vararg{Int}
+#														 )::GL_TermInds 
+#
+#	GL_TermInds(1, weight, ind1, indsets...)
+#
+#end  
+
+#function GL_TermInds(energy_class::Int,
+#														 #weight::Float64,
+#														 ind1::AbstractVector{Int},
+#														 indsets::Vararg{<:AbstractVector{Int}}
+#														 )::GL_TermInds 
+#
+#	GL_TermInds(energy_class, 1.0, ind1, indsets...)
+#
+#end 
+#
+#function GL_TermInds(energy_class::Int,
+#														 #weight::Float64,
+#														 ind1::Int,
+#														 indsets::Vararg{Int},
+#														 )::GL_TermInds 
+#
+#	GL_TermInds(energy_class, 1.0, ind1, indsets...)
+#
+#end 
+
+
+#function GL_TermInds(#energy_class::Int,
+#														 #weight::Float64,
+#														 ind1::AbstractVector{Int},
+#														 indsets::Vararg{<:AbstractVector{Int}}
+#														 )::GL_TermInds 
+#
+#	GL_TermInds(1.0, ind1, indsets...)
+#
+#end 
+#
+#function GL_TermInds(#energy_class::Int,
+#														 #weight::Float64,
+#														 ind1::Int,
+#														 indsets::Vararg{Int}
+#														 )::GL_TermInds 
+#
+#	GL_TermInds(1.0, ind1, indsets...)
+#
+#end 
+
+
+
+
+
+#function GL_TermInds(#energy_class::Int, weight::Float64,
+#														 #ind1::Int, 
+#														 inds::Vararg{Int}
+#														 )::GL_TermInds
+#
+#	GL_TermInds(hcat(indsets...))
+#
+#end 
+
+
+field_rank(I::AbstractMatrix{Int})::Int = size(I,1)
+
+nr_fields(I::AbstractMatrix{Int})::Int = size(I,2)
+
+
+
+
+function parse_inds(inds::Vararg{T,N} where T)::Matrix{Int} where N
+
+	rank = map(inds) do i
+		
+		i isa Union{Int, Tuple{Vararg{Int}}, AbstractVector{Int}}   
+	
+		return length(i)
+
+	end 
+
+	@assert length(unique(rank))==1 
+
+	return [getindex(inds[j], i) for i=1:rank[1], j=1:N]
+
+end 
+
+
+
+struct GL_TermInds
+
+	Inds::Matrix{Int}
+	IndsCC::Matrix{Int}
+
+#	function GL_TermInds(indsets::Vararg{T,N} where T)::GL_TermInds where N 
+#	
+#		if N==1 && Utils.isList(only(indsets), Union{Tuple{Vararg{Int}},
+#																								 AbstractVector{Int}})
+#	
+#			return GL_TermInds(only(indsets)...)
+#	
+#		end 
+#	
+#	end 
+
+
+	function GL_TermInds(i1, i2)::GL_TermInds 
+
+		I1 = parse_inds(i1...)
+		I2 = parse_inds(i2...)
+
+		@assert field_rank(I1)==field_rank(I2)	
+	
+		return new(I1,I2) 
+	
+	end   
+
+
+end	
+	
+GL_TermInds((i1,i2))::GL_TermInds = GL_TermInds(i1, i2)  
+
+
+field_rank(c::GL_TermInds)::NTuple{2,Int} = (field_rank(c.Inds), field_rank(c.IndsCC))
+
+nr_fields(c::GL_TermInds)::NTuple{2,Int} = (nr_fields(c.Inds), nr_fields(c.IndsCC))
+
+
+each_field_i(c::GL_TermInds)::Base.Generator = eachcol(c.Inds)
+each_fieldcc_i(c::GL_TermInds)::Base.Generator = eachcol(c.IndsCC)
+
+#
+#
+#function positions_field(c::GL_TermInds)::NTuple{2,Union{Colon,UnitRange}}
+#
+#	(Colon(), 1:div(term_order(c),2))
+#
+#end 
+#
+#function positions_fieldcc(c::GL_TermInds)::NTuple{2,Union{Colon,UnitRange}}
+#
+#	n = div(term_order(c),2)
+#
+#	return (Colon(), n+1:2n)
+#
+#end 
+#
+
+#select_field(I::AbstractMatrix{<:Int})::AbstractMatrix{Int} = view(c.Inds, positions_field(c)...) 
+#
+#select_fieldcc(c::GL_TermInds)::AbstractMatrix{Int} = view(c.Inds, positions_fieldcc(c)...)
+#
+
+
+
+
+struct GL_DegenerateTerms 
+
+	EnergyClass::Int  
+
+	Weight::Float64
+
+	Terms::Vector{GL_TermInds}
+
+
+	function GL_DegenerateTerms(class::Int, 
+															weight::Float64,
+															coeffs::AbstractVector{GL_TermInds}
+															)::GL_DegenerateTerms
+
+		rank = unique(field_rank.(coeffs))
+
+		@assert length(rank)==1 "The coeffs should be for the same fields!"
+
+		n = unique(sum.(nr_fields.(coeffs)))
+
+		@assert length(n)==1 "The coeffs should have the same order!"
+
+		return new(class, weight, coeffs)
+
+	end 
+
+
+	function GL_DegenerateTerms(class::Int, 
+															weight::Float64,
+															coeffs...
+															)::GL_DegenerateTerms 
+
+		GL_DegenerateTerms(class, weight, Utils.flat(coeffs...))
+
+	end 
+
+	function GL_DegenerateTerms(#class::Int, 
+															weight::Float64,
+															c1::Union{Utils.List,GL_TermInds},
+															coeffs...,
+															)::GL_DegenerateTerms
+
+		GL_DegenerateTerms(1, weight, c1, coeffs...)
+
+	end 
+
+	function GL_DegenerateTerms(#class::Int, 
+															#weight::Float64,
+#															coeffs::Vararg{GL_TermInds}
+															c1::Union{Utils.List,GL_TermInds},
+															coeffs...,
+															)::GL_DegenerateTerms
+
+		GL_DegenerateTerms(1, 1.0, c1, coeffs...)
+
+	end 
+
+	function GL_DegenerateTerms(class::Int, 
+															#weight::Float64,
+															c1::Union{Utils.List,GL_TermInds},
+															coeffs...#::Vararg{GL_TermInds}
+															)::GL_DegenerateTerms
+
+		GL_DegenerateTerms(class, 1.0, c1, coeffs...)
+
+	end 
+
+end 
+
+
+field_rank(t::GL_DegenerateTerms)::NTuple{2,Int} = field_rank(first(t.Terms))
+
+nr_fields(t::GL_DegenerateTerms)::NTuple{2,Int} = nr_fields(first(t.Terms))
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+struct GL_Density 
+
+	Coeffs::Vector{Float64}
+
+	Terms::Vector{GL_DegenerateTerms}
+
+#	FieldRank::NTuple{2,Int}
+
+#	NrFields::NTuple{2,Int} 
+
+#	function GL_Density(terms::Vararg{<:GL_DegenerateTerms})::GL_Density
+#
+#		GL_Density([t for t in terms])
+#
+#	end 
+	
+
+	function GL_Density(coeffs::Union{Real,AbstractVector{<:Real}},
+											terms::Vararg{<:GL_DegenerateTerms})::GL_Density
+
+		GL_Density(coeffs, [t for t in terms])
+
+	end 
+
+
+
+#	function GL_Density(terms::AbstractVector{GL_DegenerateTerms})::GL_Density
+#
+#		new(ones(length(terms)),terms)
+#
+#	end  
+
+	function GL_Density(coeffs::Union{Real,AbstractVector{<:Real}},
+											terms::AbstractVector{GL_DegenerateTerms}
+											)
+
+		@assert length(coeffs)==length(terms)
+
+		r = unique(field_rank.(terms))
+
+		@assert length(r)==1 && length(unique(only(r)))==1 "Not same fields"
+
+		return new(vcat(coeffs), terms)
+
+	end 
+
+end 
+
+
+field_rank(d::GL_Density)::NTuple{2,Int} = field_rank(first(d.Terms))
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+
+function D4h_density_homog_(a::Union{Real,AbstractVector{<:Real}},
+														b::AbstractVector{<:Real}
+														)::GL_Density 
+
+	GL_Density(vcat(a,b),
+														GL_DegenerateTerms(1.0, 
+									[GL_TermInds(1,1), GL_TermInds(2,2)]),
+
+													 GL_DegenerateTerms(1, 1.0, 
+									[(GL_TermInds(rep(rep(i))), GL_TermInds(rep(i,other[i]))
+																			) for i=1:2]),
+
+													 GL_DegenerateTerms(2, 0.5,
+									[GL_TermInds(rep(i),rep(other[i])) for i=1:2]),
+													 
+													 GL_DegenerateTerms(3, 1.0, GL_TermInds(rep(1,2)))
+														 )
+
+end 
+
+function D4h_density_grad_(k::AbstractVector{<:Real})::GL_Density
+	
+	GL_Density(k,
+														GL_DegenerateTerms(1, 
+										[GL_TermInds(rep([rep(i)])) for i=1:2]),
+
+														GL_DegenerateTerms(2, 
+										[GL_TermInds(rep([(i,other[i])])) for i=1:2]),
+
+														GL_DegenerateTerms(3, 
+										[GL_TermInds([rep(i)],[rep(other[i])]) for i=1:2]),
+
+														GL_DegenerateTerms(4,
+										[GL_TermInds([(i,other[i])],[(other[i],i)]) for i=1:2]),
+
+														GL_DegenerateTerms(5, 
+										[GL_TermInds(rep([(3,i)])) for i=1:2])
+
+															)
+
+end 
+
+
+
+
+
+
+
+
+function (D::GL_Density)(field::AbstractArray{<:Number,N},
+												 fieldcc::AbstractArray{<:Number,N}=conj(field)
+												 )::ComplexF64	where N 
+
+	@assert all(==(N), field_rank(D))
+
+
+	f::ComplexF64 = 0.0 + 0.0im 
+
+	for (coef,degen_terms) in zip(D.Coeffs,D.Terms)
+
+		for term in degen_terms.Terms 
+
+			q::ComplexF64 = coef*degen_terms.Weight 
+
+			for i in each_field_i(term) 
+
+				q *= field[i...]
+
+			end 
+
+			for i in each_fieldcc_i(term)
+
+				q *= fieldcc[i...]
+
+			end  
+
+			f += q
+
+		end 
+
+	end 
+
+	return f 
+
+end 
+
+
+
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+
 ignore_zero_imag(x::Real)::Real = x
 
 ignore_zero_imag(x::ComplexF64)::Real = abs(imag(x))<1e-12 ? real(x) : error() 
@@ -53,6 +483,11 @@ function iterate_GL_terms(coeffs::AbstractVector{<:Real},
 	((c1*c2,comb) for (c1,(c2,combs)) in zip(coeffs,indsets) for comb in combs)
 	
 end 
+
+
+
+
+
 
 
 #function D4h_total_1D(get_eta::Function,
@@ -81,6 +516,16 @@ end
 #	D4h_density_homog(eta,a,b) + D4h_density_grad(covJacob,K)
 #
 #end 
+
+
+#struct GL_FreeEnergy 
+#
+#	order::Int 
+#
+##	coeffs::OrderedDict{Int,
+#
+#end 
+
 
 
 function D4h_density_homog_old((x,y)::AbstractVector{<:Number},
@@ -350,9 +795,11 @@ function D4h_density_grad(D::AbstractMatrix{<:Number},
 													coeffs_ord2::AbstractVector{<:Real}
 													 )::Float64
 	
-#	@assert D4h_density_grad_old(D,coeffs_ord2)≈ignore_zero_imag(f) 
+	f = ignore_zero_imag(D4h_density_grad(D,conj(D),coeffs_ord2))
 
-	ignore_zero_imag(D4h_density_grad(D,conj(D),coeffs_ord2))
+	@assert D4h_density_grad_old(D,coeffs_ord2)≈f 
+
+	return f 
 
 end 
 
@@ -548,15 +995,15 @@ function chain_rule_inner(dF_df::AbstractVector{T1},
 end 
 
 function chain_rule_inner(dF_df::AbstractMatrix{T1},
-										df_dx::AbstractVector{T2}
-										)::Vector{promote_type(T1,T2)} where {T1<:Number,T2<:Number}
+										df_dx::AbstractVecOrMat{T2}
+										)::Array{promote_type(T1,T2),N} where {T1<:Number,T2<:Number,N}
 
 	dF_df*df_dx
 
 end 
 
 function chain_rule_inner(A::AbstractVecOrMat,B::AbstractVecOrMat,
-													a::AbstractVector,b::AbstractVector
+													a::AbstractVecOrMat,b::AbstractVecOrMat
 													)
 	chain_rule_inner(A,a) + chain_rule_inner(B,b)
 																	
@@ -641,6 +1088,8 @@ function D4h_density_1D(P::UODict)::Function
 			
 	f_etaJ = Hamiltonian.eta_interp_deriv(P)
 	
+	f_etaH = Hamiltonian.eta_interp_deriv2(P)
+	
 	Delta0 = real(only(unique(Hamiltonian.eta_magnitudes(P))))
 	
 	anisotropy = 0#-0.6
@@ -660,18 +1109,32 @@ function D4h_density_1D(P::UODict)::Function
 		N = f_eta(g) 
 		
 		dN_dg = f_etaJ(g)
-		
+	
+
 		dN_dx = chain_rule_outer(dN_dg, grad_g) # already covariant 
 		
 
 		F = D4h_density_homog(N,a,b) +  D4h_density_grad(dN_dx,K) 
 
+		dF_dN = D4h_density_homog_deriv(N, a, b)
+		
+		dF_dg = chain_rule_inner(dF_dN, dN_dg)
 
-		dF_dg = chain_rule_inner(D4h_density_homog_deriv(N, a, b), dN_dg)
 
 		dF_dgx,dF_dgy = chain_rule_inner(D4h_density_grad_deriv(dN_dx,K), dN_dg) 
 
-		return [F, 2real(dF_dg), 2real(dF_dgx), 2real(dF_dgy)]
+
+		d2N_dg2 = f_etaH(g)
+
+		aux = chain_rule_inner(transpose(dN_dg), dN_dg', D4h_density_homog_deriv2(N, a, b)...)[:]
+		
+		d2Fh_dg2 = chain_rule_inner(dF_dN,d2N_dg2) + chain_rule_inner(aux, dN_dg)
+
+
+		return [F, 
+						2real(dF_dg), 2real(dF_dgx), 2real(dF_dgy),
+						2real(d2Fh_dg2 + d2Fg_dg2)
+						]
 
 
 

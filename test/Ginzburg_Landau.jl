@@ -18,9 +18,175 @@ import QuadGK ,Random
 colors = ["brown","red","coral","peru","gold","olive","forestgreen","lightseagreen","dodgerblue","midnightblue","darkviolet","deeppink"] |> Random.shuffle
 	
 
+@testset "struct GL" begin 
+
+	M = GL.parse_inds(1)
+
+	for i in [
+						1,
+						[1],
+						(1,),
+						[(1,)],
+					 ([1],),
+					 ] 
+	
+		#println() 
+
+		M2 = GL.parse_inds(i...)
+		
+		@test M2==M
+
+		@test GL.nr_fields(M2)==GL.field_rank(M2)==1 
 
 
-@testset "Derivatives of F" begin 
+	end 
+
+
+	M3  = GL.parse_inds(1,2) 
+
+	for inds in ([1,2],(1,2),[(1,),(2,)],([1],[2]))
+
+		#println() 
+
+
+		M4 = GL.parse_inds(inds...)
+
+		@test M3==M4 
+
+		@test GL.nr_fields(M4)==2 
+		@test GL.field_rank(M4)==1 
+
+	end
+
+
+	M5 = GL.parse_inds((1,2)) 
+
+	for inds in (	[(1,2)],([1,2],) )
+
+
+		M6 = GL.parse_inds(inds...)
+
+		@test GL.nr_fields(M6)==1 
+		@test GL.field_rank(M6)==2 
+
+		@test M5==M6 
+
+	end 
+
+
+	M7 = GL.parse_inds((1,2,3),(2,3,1))
+
+
+	for inds in [ [(1,2,3),(2,3,1)], ([1,2,3],[2,3,1]) ] 
+
+		M8 = GL.parse_inds(inds...)
+
+		@test GL.nr_fields(M8)==2
+		@test GL.field_rank(M8)==3
+
+		@test M7==M8
+
+	end 
+
+
+
+end 
+
+
+#println("\n\n"); error() 
+
+
+@testset "D4h GL struct coeff" begin 
+	
+	D4hdh = GL.D4h_density_homog_(rand(),rand(3))
+
+	for (r,n,(Q1,Q2)) in zip([1,1,2],
+										 [2,4,2],
+										 [(GL.D4h_homog_ord2, D4hdh),
+											(GL.D4h_homog_ord4, 
+											 GL.GL_Density(rand(3),D4hdh.Terms[2:end])
+											 ),
+											(GL.D4h_grad_ord2, 
+											 GL.D4h_density_grad_(rand(5)))
+											])
+
+#		(r,n) == (1,2) || continue 
+#		(r,n) == (1,4) || continue 
+
+#		r==2 || continue 
+
+		#println("\nr=$r")
+
+		for (i,(P,P_)) in enumerate(zip(Q1,Q2.Terms))
+
+
+			@test P_.EnergyClass==i
+	
+			@test P_.Weight == P[1]
+
+
+
+			for q_ in P[2]
+
+
+				A,B = [hcat((vcat(qi...) for qi in q)...) for q in q_]
+				
+				#@show size(A) size(P_.coeffs[1].Inds)
+
+				tests = map(P_.Terms) do c #might not be in the same order 
+
+#					@show n GL.nr_fields(c) 
+
+#					@show c GL.field_rank(c) GL.nr_fields(c)
+
+					@test GL.field_rank(c)==(r,r)
+
+					@test sum(GL.nr_fields(c))==n
+					
+					@test size(c.Inds)==size(c.IndsCC) 
+
+					if size(A)==size(c.Inds)
+
+						return A==c.Inds && B==c.IndsCC 
+
+					elseif size(A')==size(c.Inds)
+
+						return A'==c.Inds && B==c.IndsCC'
+
+					else 
+
+						error()
+
+					end 
+
+				end 
+			
+			if !any(tests)
+
+#				@show i A B 
+#				continue 
+
+			end 
+
+			@test any(tests)
+
+
+			end 
+
+#			@test size(tests,1)==size(tests,2)
+
+
+
+
+
+		end 	
+	end  
+
+
+end 
+
+
+@testset "GL struct: compare densities" begin 
 
 	for trial in 1:10
 	
@@ -33,86 +199,90 @@ colors = ["brown","red","coral","peru","gold","olive","forestgreen","lightseagre
 		a = rand(1) 
 	
 		b = rand(3) 
-	
-	#	@time begin for i=1:100 GL.D4h_density_grad(D,K) end end 
-	
-	#	@time begin for i=1:100 GL.D4h_density_grad2(D,K) end end 
-	
-	
-	#	GL.D4h_density_grad(D,K)#≈GL.D4h_density_grad2(D,K) 
-	#	GL.D4h_density_homog(eta,a,b)#≈GL.D4h_density_homog2(eta,a,b)
-	
-	#	GL.D4h_density_homog_deriv(eta,a,b)
-	
-		q1,q2 = GL.D4h_density_homog_deriv(eta,conj(eta),a,b)
-	
-		@test q1≈conj(q2)
+
+		@test GL.D4h_density_homog(eta,a,b)≈GL.D4h_density_homog_(a,b)(eta)
+		@show GL.D4h_density_homog_(a,b)(eta)
 		
-		@test q1≈GL.D4h_density_homog_deriv(eta,a,b)
-	
-	
-		Q1,Q2 = GL.D4h_density_grad_deriv(D,conj(D),K) 
-	
-		@test Q1≈conj(Q2)
-		@test Q1≈GL.D4h_density_grad_deriv(D,K)
+		@test GL.D4h_density_grad(D,K)≈GL.D4h_density_grad_(K)(D)
+		@show GL.D4h_density_grad(D,K)
 
-		dd,cd = GL.D4h_density_homog_deriv2(eta,a,b)
-		
-		dc,cc = GL.D4h_density_homog_deriv2(conj(eta),a,b)
-
-
-		println(cd[1,2]," ",cd[2,1])
-		println(cc[1,2]," ",cc[2,1])
-		println(dc[1,2]," ",dc[2,1])
-		println(dd[1,2]," ",dd[2,1])
-
-		@show conj(cc)≈ cd
-		@show conj(dd)≈ dc
-
-		break 
-	end  
+	end 
 
 end 
 
 
-error("end")
 
-println()
-
-
-P = (
-#		 length = 60,
-#		 Barrier_shape = 2, Barrier_width = 0.03, 
-#Barrier_height = 0, 
-
-SCDW_shape = 3,
-SCDW_phasediff = 0.8,
-#		 SCDW_width = 0.15, 
-		 SCpx_magnitude = 0.1, 
-);
-
-P = Device.Hamiltonian.adjust_paramcomb(1, P)
-#Device.Lattice.adjust_paramcomb(1, P))
-
-@show P 
-
-
-
-
-@show GL.D4h_density_1D(P)(2rand()-1,rand(3))
-
-
-		
-
-
-
-PyPlot.close()
-
-fig,(ax1,ax2) = PyPlot.subplots(1,2,figsize=(10,5))
-
-
-SCDW_shapes = [0,2,3,6]
-
+#
+#
+#@testset "Derivatives of F" begin 
+#
+#	
+#	#	@time begin for i=1:100 GL.D4h_density_grad(D,K) end end 
+#	
+#	#	@time begin for i=1:100 GL.D4h_density_grad2(D,K) end end 
+#	
+#	
+#	
+#	#	GL.D4h_density_homog_deriv(eta,a,b)
+#	
+#		q1,q2 = GL.D4h_density_homog_deriv(eta,conj(eta),a,b)
+#	
+#		@test q1≈conj(q2)
+#		
+#		@test q1≈GL.D4h_density_homog_deriv(eta,a,b)
+#	
+#	
+#		Q1,Q2 = GL.D4h_density_grad_deriv(D,conj(D),K) 
+#	
+#		@test Q1≈conj(Q2)
+#		@test Q1≈GL.D4h_density_grad_deriv(D,K)
+#
+#		dd,cd = GL.D4h_density_homog_deriv2(eta,a,b)
+#		
+#
+#		break 
+#	end  
+#
+#end 
+#
+#
+#
+#println()
+#
+#
+#P = (
+##		 length = 60,
+##		 Barrier_shape = 2, Barrier_width = 0.03, 
+##Barrier_height = 0, 
+#
+#SCDW_shape = 3,
+#SCDW_phasediff = 0.8,
+##		 SCDW_width = 0.15, 
+#		 SCpx_magnitude = 0.1, 
+#);
+#
+#P = Device.Hamiltonian.adjust_paramcomb(1, P)
+##Device.Lattice.adjust_paramcomb(1, P))
+#
+#@show P 
+#
+#
+#
+#
+#@show GL.D4h_density_1D(P)(2rand()-1,rand(3))
+#
+#
+#		
+#
+#
+#
+#PyPlot.close()
+#
+#fig,(ax1,ax2) = PyPlot.subplots(1,2,figsize=(10,5))
+#
+#
+#SCDW_shapes = [0,2,3,6]
+#
 #Utils.Random_Items(colors,length(SCDW_shapes))
 
 
