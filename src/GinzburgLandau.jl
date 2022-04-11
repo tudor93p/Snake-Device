@@ -8,6 +8,7 @@ import myLibs: Utils
 using OrderedCollections: OrderedDict 
 
 using myLibs.Parameters: UODict  
+import Base.==#, Base.iterate 
 
 import Helpers 
 using Constants: MAIN_DIM 
@@ -59,64 +60,64 @@ D4h_grad_ord2 = [
 
 
 
-#function GL_TermInds(#energy_class::Int,
+#function GL_MixedProduct(#energy_class::Int,
 #														 weight::Float64,
 #														 ind1::AbstractVector{Int},
 #														 indsets::Vararg{<:AbstractVector{Int}}
-#														 )::GL_TermInds 
+#														 )::GL_MixedProduct 
 #
-#	GL_TermInds(1, weight, ind1, indsets...)
+#	GL_MixedProduct(1, weight, ind1, indsets...)
 #
 #end 
 #
-#function GL_TermInds(#energy_class::Int,
+#function GL_MixedProduct(#energy_class::Int,
 #														 weight::Float64,
 #														 ind1::Int,
 #														 indsets::Vararg{Int}
-#														 )::GL_TermInds 
+#														 )::GL_MixedProduct 
 #
-#	GL_TermInds(1, weight, ind1, indsets...)
+#	GL_MixedProduct(1, weight, ind1, indsets...)
 #
 #end  
 
-#function GL_TermInds(energy_class::Int,
+#function GL_MixedProduct(energy_class::Int,
 #														 #weight::Float64,
 #														 ind1::AbstractVector{Int},
 #														 indsets::Vararg{<:AbstractVector{Int}}
-#														 )::GL_TermInds 
+#														 )::GL_MixedProduct 
 #
-#	GL_TermInds(energy_class, 1.0, ind1, indsets...)
+#	GL_MixedProduct(energy_class, 1.0, ind1, indsets...)
 #
 #end 
 #
-#function GL_TermInds(energy_class::Int,
+#function GL_MixedProduct(energy_class::Int,
 #														 #weight::Float64,
 #														 ind1::Int,
 #														 indsets::Vararg{Int},
-#														 )::GL_TermInds 
+#														 )::GL_MixedProduct 
 #
-#	GL_TermInds(energy_class, 1.0, ind1, indsets...)
+#	GL_MixedProduct(energy_class, 1.0, ind1, indsets...)
 #
 #end 
 
 
-#function GL_TermInds(#energy_class::Int,
+#function GL_MixedProduct(#energy_class::Int,
 #														 #weight::Float64,
 #														 ind1::AbstractVector{Int},
 #														 indsets::Vararg{<:AbstractVector{Int}}
-#														 )::GL_TermInds 
+#														 )::GL_MixedProduct 
 #
-#	GL_TermInds(1.0, ind1, indsets...)
+#	GL_MixedProduct(1.0, ind1, indsets...)
 #
 #end 
 #
-#function GL_TermInds(#energy_class::Int,
+#function GL_MixedProduct(#energy_class::Int,
 #														 #weight::Float64,
 #														 ind1::Int,
 #														 indsets::Vararg{Int}
-#														 )::GL_TermInds 
+#														 )::GL_MixedProduct 
 #
-#	GL_TermInds(1.0, ind1, indsets...)
+#	GL_MixedProduct(1.0, ind1, indsets...)
 #
 #end 
 
@@ -124,12 +125,12 @@ D4h_grad_ord2 = [
 
 
 
-#function GL_TermInds(#energy_class::Int, weight::Float64,
+#function GL_MixedProduct(#energy_class::Int, weight::Float64,
 #														 #ind1::Int, 
 #														 inds::Vararg{Int}
-#														 )::GL_TermInds
+#														 )::GL_MixedProduct
 #
-#	GL_TermInds(hcat(indsets...))
+#	GL_MixedProduct(hcat(indsets...))
 #
 #end 
 
@@ -138,7 +139,36 @@ field_rank(I::AbstractMatrix{Int})::Int = size(I,1)
 
 nr_fields(I::AbstractMatrix{Int})::Int = size(I,2)
 
+each_fieldfactor(I::AbstractMatrix{Int})::Base.Generator = eachcol(I)
 
+
+
+
+
+function disregard_fieldfactors(I::AbstractMatrix{Int}, 
+																i::Union{Int,AbstractVector{Int}},
+															)::AbstractMatrix{Int}
+
+	select_fieldfactors(I, setdiff(axes(I,2),vcat(i)))
+
+end 
+
+
+function select_fieldfactors(I::AbstractMatrix{Int},
+														 i::Union{Int,AbstractVector{Int}}
+														 )::AbstractMatrix{Int}
+
+	selectdim(I, 2, vcat(i))
+
+end 
+
+function select_fieldfactor(I::AbstractMatrix{Int},
+														 i::Int 
+														 )::AbstractVector{Int}
+
+	selectdim(I, 2, i)
+
+end 
 
 
 function parse_inds(inds::Vararg{T,N} where T)::Matrix{Int} where N
@@ -154,62 +184,431 @@ function parse_inds(inds::Vararg{T,N} where T)::Matrix{Int} where N
 	@assert length(unique(rank))==1 
 
 	return [getindex(inds[j], i) for i=1:rank[1], j=1:N]
+end  
+
+struct GL_Product
+
+	Weight::Float64
+
+	Inds::Matrix{Int}
+
+	
+#	function GL_Product(w::Float64, M::AbstractMatrix{Int})::GL_Product
+#
+#		new(w, M)
+#
+#	end 
+
+end 
+
+function GL_Product(w::Float64, 
+										ind1::Union{Int,Tuple{Vararg{Int}},AbstractVector{Int}},
+										inds...)::GL_Product 
+
+	GL_Product(w, parse_inds(ind1, inds...))
 
 end 
 
 
 
-struct GL_TermInds
+struct GL_Tensor 
 
-	Inds::Matrix{Int}
-	IndsCC::Matrix{Int}
+	Weight::Float64
 
-#	function GL_TermInds(indsets::Vararg{T,N} where T)::GL_TermInds where N 
+	Inds::Matrix{Int} # size: tensor_rank x length(Components) 
+
+	Components::Vector{GL_Product}   
+
+end 
+
+function GL_Tensor(i::AbstractMatrix{Int},
+									 t::AbstractVector{GL_Product}
+									 )::GL_Tensor
+
+	GL_Tensor(1.0, i, t)
+
+end 
+
+function GL_Tensor(
+									 t::AbstractVector{GL_Product}
+									 )::GL_Tensor
+
+	GL_Tensor(1.0, hcat(1), t)
+
+end 
+
+
+
+
+field_rank(p::GL_Product)::Int = field_rank(p.Inds)
+nr_fields(p::GL_Product)::Int = nr_fields(p.Inds)  
+
+
+
+
+
+
+each_fieldfactor(p::Union{GL_Product,GL_Tensor})::Base.Generator = each_fieldfactor(p.Inds)
+
+
+function same_inds(p::Union{GL_Product,GL_Tensor},
+									 q::Union{GL_Product,GL_Tensor}
+									 )::Bool 
+
+	size(p.Inds)==size(q.Inds) && p.Inds==q.Inds 
+
+end 
+
+function same_inds(p::Union{GL_Product,GL_Tensor})::Function 
+
+	same_inds_(q::Union{GL_Product,GL_Tensor})::Bool  = same_inds(p,q)
+
+end  
+
+function ==(p::GL_Product, q::GL_Product)::Bool 
+
+	same_inds(p, q) && p.Weight≈q.Weight
+
+end  
+
+function Base.zero(p::GL_Product)::GL_Product 
+
+	GL_Product(0.0, zeros(Int, field_rank(p), 0))
+
+end 
+
+
+function Base.findfirst(i::AbstractVector{Int}, p::GL_Product)
+
+	for (i0,I0) in enumerate_fieldfactors(p)
+
+		i==I0 && return i0 
+
+	end 
+
+	return nothing 
+
+end 
+
+function Base.findall(i::AbstractVector{Int}, 
+											p::Union{GL_Product,GL_Tensor})::Vector{Int}
+
+	[i0 for (i0,I0) in enumerate_fieldfactors(p) if i==I0] 
+
+end 
+
+
+
+function disregard_fieldfactors(p::GL_Product, args...)::AbstractMatrix{Int} 
+	
+	disregard_fieldfactors(p.Inds, args...)
+
+end 
+
+
+function select_fieldfactors(p::GL_Product, args...)::AbstractMatrix{Int}
+
+	select_fieldfactors(p.Inds, args...)
+
+end 
+
+function select_fieldfactor(p::GL_Product, args...)::AbstractVector{Int}
+
+	select_fieldfactor(p.Inds, args...)
+
+end 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+function (p::GL_Product)(field::AbstractArray{T,N}
+												 )::promote_type(T,Float64) where {T<:Number,N}
+
+	@assert N==field_rank(p)
+
+	out::promote_type(T,Float64) = p.Weight
+
+	for i in each_fieldfactor(p) 
+
+		out *= field[i...] 
+
+	end 
+
+	return out 
+
+end 
+
+
+#function cumulate(p::GL_Product)::GL_Product 
+#	
+#	unique(each_fieldfactor(p))
+#
+#end
+
+
+function cumulate(ps::AbstractVector{GL_Product},
+									start::Int=1
+									)::AbstractVector{GL_Product}
+
+	for i=start:length(ps)-1
+
+		js = i+1:length(ps) 
+
+		abs(ps[i].Weight)<1e-10 && return cumulate(view(ps, vcat(1:i-1,js)), i)
+
+
+		sim_i = i .+ findall(same_inds(ps[i]), view(ps, js)) 
+
+		isempty(sim_i) && continue  
+
+		W = ps[i].Weight + sum(ps[j].Weight for j in sim_i)
+
+		abs(W)<1e-10 && return cumulate(view(ps,vcat(1:i-1,setdiff(js,sim_i))),i)
+
+
+		return cumulate(vcat(view(ps, 1:i-1),
+												 GL_Product(W, ps[i].Inds),
+												 view(ps,setdiff(js,sim_i))
+												 ),
+										i+1)
+
+	end 
+
+	return ps#[p for p in ps if abs(p.Weight)>1e-10]
+
+end 
+
+
+
+function derivative(p::GL_Product, i::Int, weight_factor::Real=1)::GL_Product 
+
+	@assert 1<=i<=nr_fields(p) 
+
+	return GL_Product(p.Weight*weight_factor, disregard_fieldfactors(p,i)) 
+
+end 
+	
+
+
+
+function count_unique(p::GL_Product)::Vector{NTuple{2,Int}}#GL_Product}
+
+	n = nr_fields(p)
+
+	checked = falses(n)
+	degen = zeros(Int, n) 
+
+	for (i0,I0) in enumerate_fieldfactors(p)
+
+		checked[i0] && continue 
+
+		checked[i0] = true 
+
+		degen[i0] = 1 
+
+		for i1 in i0+1:n 
+
+			I0==select_fieldfactor(p,i1) || continue 
+
+			@assert !checked[i1]  
+
+			checked[i1] = true  
+
+			degen[i0] += 1 
+
+		end 
+
+	end 
+
+	return [(i,nr) for (i,nr) in enumerate(degen) if nr>0]
+
+end 
+
+function derivative(p::GL_Product, I0::AbstractVector{Int}
+										)::GL_Product
+
+	occurences = findall(I0, p)
+
+	isempty(occurences) && return zero(p)
+
+	return derivative(p, occurences[1], length(occurences))
+
+#	cumulate([derivative(p,i) for (i,I) in enumerate_fieldfactors(p) if I==I0])
+
+end  
+
+
+function derivatives(p::GL_Product
+										 )::Tuple{Matrix{Int},Vector{GL_Product}}
+	
+	cu = count_unique(p)
+
+	I = Matrix{Int}(undef,field_rank(p),length(cu))
+
+	P = Vector{GL_Product}(undef, length(cu))
+
+	for (order,(i,nr)) in enumerate(count_unique(p))
+
+		setindex!(select_fieldfactor(I, order), select_fieldfactor(p,i), :)
+
+		P[order] = GL_Product(p.Weight*nr, disregard_fieldfactors(p,i)) 
+
+	end 
+
+	return I,P
+
+end 
+
+
+
+
+#
+#	for (i,I) in enumerate_fieldfactors(p)
+#
+#
+#		cumulate([GL_Product(p.Weight, disregard_fieldfactors(p, i)) 
+#						for (i,I) in enumerate_fieldfactors(p) if I==I0])
+#
+
+
+
+
+
+
+
+
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+struct GL_MixedProduct
+
+	Weight::Float64 
+
+	Inds::GL_Product
+
+	IndsCC::GL_Product
+
+
+#	Inds::Matrix{Int} 
+
+	#IndsCC::Matrix{Int}
+
+#	function GL_MixedProduct(indsets::Vararg{T,N} where T)::GL_MixedProduct where N 
 #	
 #		if N==1 && Utils.isList(only(indsets), Union{Tuple{Vararg{Int}},
 #																								 AbstractVector{Int}})
 #	
-#			return GL_TermInds(only(indsets)...)
+#			return GL_MixedProduct(only(indsets)...)
 #	
 #		end 
 #	
 #	end 
 
 
-	function GL_TermInds(i1, i2)::GL_TermInds 
+end 
 
-		I1 = parse_inds(i1...)
-		I2 = parse_inds(i2...)
-
-		@assert field_rank(I1)==field_rank(I2)	
+#	function GL_MixedProduct(w::Float64, 
+#													 I1::GL_Product, I2::GL_Product)::GL_MixedProduct 
+#
+#		new(w, I1, I2)
+#
+#	end 
 	
-		return new(I1,I2) 
+function GL_MixedProduct(I1::GL_Product, I2::GL_Product)::GL_MixedProduct 
+
+	GL_MixedProduct(1.0, I1, I2)
+
+end 
+
+
+function GL_MixedProduct(w::Float64, i1, i2)::GL_MixedProduct 
+
+	I1 = GL_Product(i1...)
+	I2 = GL_Product(i2...)
+
+	@assert field_rank(I1)==field_rank(I2)	
+
+	return GL_MixedProduct(w,I1,I2) 
+
+end   
 	
-	end   
+GL_MixedProduct(i1, i2)::GL_MixedProduct = GL_MixedProduct(1.0, i1, i2) 
 
+GL_MixedProduct((i1,i2))::GL_MixedProduct = GL_MixedProduct(i1, i2)  
 
-end	
+function GL_MixedProduct(w::Float64, (i1,i2))::GL_MixedProduct 
 	
-GL_TermInds((i1,i2))::GL_TermInds = GL_TermInds(i1, i2)  
+	GL_MixedProduct(w, i1, i2)  
+
+end 
 
 
-field_rank(c::GL_TermInds)::NTuple{2,Int} = (field_rank(c.Inds), field_rank(c.IndsCC))
-
-nr_fields(c::GL_TermInds)::NTuple{2,Int} = (nr_fields(c.Inds), nr_fields(c.IndsCC))
 
 
-each_field_i(c::GL_TermInds)::Base.Generator = eachcol(c.Inds)
-each_fieldcc_i(c::GL_TermInds)::Base.Generator = eachcol(c.IndsCC)
+field_rank(c::GL_MixedProduct)::NTuple{2,Int} = (field_rank(c.Inds), field_rank(c.IndsCC))
 
+nr_fields(c::GL_MixedProduct)::NTuple{2,Int} = (nr_fields(c.Inds), nr_fields(c.IndsCC))
+
+nr_fields(c::GL_MixedProduct, field::Symbol)::Int = nr_fields(c, Val(field))
+
+nr_fields(c::GL_MixedProduct, ::Val{:field})::Int = nr_fields(c.Inds) 
+
+nr_fields(c::GL_MixedProduct, ::Val{:fieldcc})::Int = nr_fields(c.IndsCC)
+
+
+
+field_rank(c::GL_MixedProduct, field::Symbol)::Int = field_rank(c, Val(field))
+
+field_rank(c::GL_MixedProduct, ::Val{:field})::Int = field_rank(c.Inds) 
+
+field_rank(c::GL_MixedProduct, ::Val{:fieldcc})::Int = field_rank(c.IndsCC) 
+
+function (P::GL_MixedProduct)(field::AbstractArray{T1,N1} where N1,
+															fieldcc::AbstractArray{T2,N2} where N2,
+															)::promote_type(T1,T2,Float64) where {
+																											T1<:Number,T2<:Number}
+
+	P.Weight*P.Inds(field)*P.IndsCC(fieldcc)
+
+end 
+
+enumerate_fieldfactors = enumerate∘each_fieldfactor 
+
+
+#===========================================================================#
 #
 #
-#function positions_field(c::GL_TermInds)::NTuple{2,Union{Colon,UnitRange}}
+#
+#---------------------------------------------------------------------------#
+
+
+#each_field_i(c::GL_MixedProduct)::Base.Generator = eachcol(c.Inds)
+#each_fieldcc_i(c::GL_MixedProduct)::Base.Generator = eachcol(c.IndsCC)
+#
+#
+#
+#function positions_field(c::GL_MixedProduct)::NTuple{2,Union{Colon,UnitRange}}
 #
 #	(Colon(), 1:div(term_order(c),2))
 #
 #end 
 #
-#function positions_fieldcc(c::GL_TermInds)::NTuple{2,Union{Colon,UnitRange}}
+#function positions_fieldcc(c::GL_MixedProduct)::NTuple{2,Union{Colon,UnitRange}}
 #
 #	n = div(term_order(c),2)
 #
@@ -220,85 +619,57 @@ each_fieldcc_i(c::GL_TermInds)::Base.Generator = eachcol(c.IndsCC)
 
 #select_field(I::AbstractMatrix{<:Int})::AbstractMatrix{Int} = view(c.Inds, positions_field(c)...) 
 #
-#select_fieldcc(c::GL_TermInds)::AbstractMatrix{Int} = view(c.Inds, positions_fieldcc(c)...)
+#select_fieldcc(c::GL_MixedProduct)::AbstractMatrix{Int} = view(c.Inds, positions_fieldcc(c)...)
 #
 
 
+#function derivative(p::GL_MixedProduct, field::Symbol, args...)
+#
+#	derivative(p, Val(field), args...)
+#
+#end 
+#
+#
+#function derivative(p::GL_MixedProduct, ::Val{:field}, i::Int
+#										)::GL_MixedProduct 
+#
+#	GL_MixedProduct(derivative(p.Inds,i), p.IndsCC)
+#
+#end 
+#
+#function derivative(p::GL_MixedProduct, ::Val{:fieldcc}, i::Int
+#										)::GL_MixedProduct 
+#
+#	GL_MixedProduct(p.Inds, derivative(p.IndsCC,i))
+#
+#end 
+#
+#	
+#
+#function derivative(P::GL_MixedProduct, ::Val{:field}, 
+#										I0::AbstractVector{Int}
+#										)::Vector{GL_MixedProduct}
+#
+#	[GL_MixedProduct(d, P.IndsCC) for d in derivative(P.Inds, I0)]
+#
+#end 
+#
+#function derivative(P::GL_MixedProduct, ::Val{:fieldcc}, 
+#										I0::AbstractVector{Int}
+#										)::Vector{GL_MixedProduct}
+#
+#	[GL_MixedProduct(P.Inds, d) for d in derivative(P.IndsCC, I0)]
+#
+#end 
 
 
-struct GL_DegenerateTerms 
 
-	EnergyClass::Int  
-
-	Weight::Float64
-
-	Terms::Vector{GL_TermInds}
-
-
-	function GL_DegenerateTerms(class::Int, 
-															weight::Float64,
-															coeffs::AbstractVector{GL_TermInds}
-															)::GL_DegenerateTerms
-
-		rank = unique(field_rank.(coeffs))
-
-		@assert length(rank)==1 "The coeffs should be for the same fields!"
-
-		n = unique(sum.(nr_fields.(coeffs)))
-
-		@assert length(n)==1 "The coeffs should have the same order!"
-
-		return new(class, weight, coeffs)
-
-	end 
-
-
-	function GL_DegenerateTerms(class::Int, 
-															weight::Float64,
-															coeffs...
-															)::GL_DegenerateTerms 
-
-		GL_DegenerateTerms(class, weight, Utils.flat(coeffs...))
-
-	end 
-
-	function GL_DegenerateTerms(#class::Int, 
-															weight::Float64,
-															c1::Union{Utils.List,GL_TermInds},
-															coeffs...,
-															)::GL_DegenerateTerms
-
-		GL_DegenerateTerms(1, weight, c1, coeffs...)
-
-	end 
-
-	function GL_DegenerateTerms(#class::Int, 
-															#weight::Float64,
-#															coeffs::Vararg{GL_TermInds}
-															c1::Union{Utils.List,GL_TermInds},
-															coeffs...,
-															)::GL_DegenerateTerms
-
-		GL_DegenerateTerms(1, 1.0, c1, coeffs...)
-
-	end 
-
-	function GL_DegenerateTerms(class::Int, 
-															#weight::Float64,
-															c1::Union{Utils.List,GL_TermInds},
-															coeffs...#::Vararg{GL_TermInds}
-															)::GL_DegenerateTerms
-
-		GL_DegenerateTerms(class, 1.0, c1, coeffs...)
-
-	end 
-
-end 
-
-
-field_rank(t::GL_DegenerateTerms)::NTuple{2,Int} = field_rank(first(t.Terms))
-
-nr_fields(t::GL_DegenerateTerms)::NTuple{2,Int} = nr_fields(first(t.Terms))
+#function derivatives(P::GL_MixedProduct, field::Symbol
+#										)::Vector{GL_MixedProduct}
+#
+#	[derivative(P, field, i) for i=1:nr_fields(P, field)]
+#
+#end 
 
 
 
@@ -309,56 +680,113 @@ nr_fields(t::GL_DegenerateTerms)::NTuple{2,Int} = nr_fields(first(t.Terms))
 #---------------------------------------------------------------------------#
 
 
-struct GL_Density 
+# high-rank tensors will have few non-vanishing index combinations 
+# stored as in GL_Product 
 
-	Coeffs::Vector{Float64}
+#	I = [getindex(inds[j], i) for i=1:rank, j=1:N]
+#
 
-	Terms::Vector{GL_DegenerateTerms}
 
 #	FieldRank::NTuple{2,Int}
+Base.length(T::GL_Tensor)::Int = length(T.Components)
 
-#	NrFields::NTuple{2,Int} 
+	# T_i nonzero only for i in columns(Inds)
 
-#	function GL_Density(terms::Vararg{<:GL_DegenerateTerms})::GL_Density
-#
-#		GL_Density([t for t in terms])
-#
-#	end 
-	
+#	TensorRank::Int #NTuple{2,Int} 
 
-	function GL_Density(coeffs::Union{Real,AbstractVector{<:Real}},
-											terms::Vararg{<:GL_DegenerateTerms})::GL_Density
 
-		GL_Density(coeffs, [t for t in terms])
-
-	end 
+#	ArgNrs::Vector{Int} 
+# argument i is taken by the tensor ArgNrs[i]
 
 
 
-#	function GL_Density(terms::AbstractVector{GL_DegenerateTerms})::GL_Density
-#
-#		new(ones(length(terms)),terms)
-#
-#	end  
 
-	function GL_Density(coeffs::Union{Real,AbstractVector{<:Real}},
-											terms::AbstractVector{GL_DegenerateTerms}
-											)
+function Base.getindex(T::GL_Tensor, i::Int
+											 )::Tuple{AbstractVector{Int},GL_Product}
 
-		@assert length(coeffs)==length(terms)
-
-		r = unique(field_rank.(terms))
-
-		@assert length(r)==1 && length(unique(only(r)))==1 "Not same fields"
-
-		return new(vcat(coeffs), terms)
-
-	end 
+	(selectdim(T.Inds, 2, i), T.Components[i])
 
 end 
 
 
-field_rank(d::GL_Density)::NTuple{2,Int} = field_rank(first(d.Terms))
+function Base.iterate(T::GL_Tensor, state::Int=1)
+
+	state > length(T) && return nothing 
+
+	return (T[state], state+1)
+
+end
+
+#function Base.getindex(T::GL_Tensor, i0::AbstractVector{Int}
+#											 )::GL_Product
+#
+#	i = findall(i0, T)
+#
+#	return isempty(i) ? zero(T.Components[1]) : T.Components[only(i)]
+#
+#end 
+
+	
+
+#nr_fields(I::AbstractMatrix{Int})::Int = size(I,2)
+
+
+		
+
+
+
+
+
+#fields = (f1, f1cc, f2, f2cc, f3, f3cc, etc.)
+
+function evaluate_component(GLT::GL_Tensor,
+														i::Int,
+														field::AbstractArray{T,N} where N
+														)::promote_type(T,Float64) where T<:Number 
+
+	evaluate_component(GLT, GLT.Components[i], field)
+
+end 
+
+function evaluate_component(GLT::GL_Tensor,
+														p::GL_Product,
+														field::AbstractArray{T,N} where N
+														)::promote_type(T,Float64) where T<:Number  
+
+	GLT.Weight * p(field) 
+
+end  
+
+
+function (GLT::GL_Tensor)(field::AbstractArray{T,N} where N, 
+												i0::AbstractVector{Int}
+												)::promote_type(T,Float64) where T<:Number 
+
+	i = findall(i0, GLT) 
+
+	isempty(i) && return 0 
+
+	return evaluate_component(GLT, only(i), field)
+
+
+#	for (n,(field,fieldcc)) in zip(ArgNrs,Base.Iterators.partition(fields, 2)) 
+
+#		out += T.Weight * Terms[n](field, fieldcc)
+
+#	end 
+
+end 	
+
+
+
+
+function (T::GL_Tensor)(field::AbstractArray)::Base.Generator 
+
+	((i, evaluate_component(T, t, field)) for (i,t) in T)
+
+end 
+
+
 
 #===========================================================================#
 #
@@ -369,94 +797,238 @@ field_rank(d::GL_Density)::NTuple{2,Int} = field_rank(first(d.Terms))
 
 
 
-function D4h_density_homog_(a::Union{Real,AbstractVector{<:Real}},
-														b::AbstractVector{<:Real}
-														)::GL_Density 
 
-	GL_Density(vcat(a,b),
-														GL_DegenerateTerms(1.0, 
-									[GL_TermInds(1,1), GL_TermInds(2,2)]),
 
-													 GL_DegenerateTerms(1, 1.0, 
-									[(GL_TermInds(rep(rep(i))), GL_TermInds(rep(i,other[i]))
-																			) for i=1:2]),
-
-													 GL_DegenerateTerms(2, 0.5,
-									[GL_TermInds(rep(i),rep(other[i])) for i=1:2]),
-													 
-													 GL_DegenerateTerms(3, 1.0, GL_TermInds(rep(1,2)))
-														 )
-
-end 
-
-function D4h_density_grad_(k::AbstractVector{<:Real})::GL_Density
-	
-	GL_Density(k,
-														GL_DegenerateTerms(1, 
-										[GL_TermInds(rep([rep(i)])) for i=1:2]),
-
-														GL_DegenerateTerms(2, 
-										[GL_TermInds(rep([(i,other[i])])) for i=1:2]),
-
-														GL_DegenerateTerms(3, 
-										[GL_TermInds([rep(i)],[rep(other[i])]) for i=1:2]),
-
-														GL_DegenerateTerms(4,
-										[GL_TermInds([(i,other[i])],[(other[i],i)]) for i=1:2]),
-
-														GL_DegenerateTerms(5, 
-										[GL_TermInds(rep([(3,i)])) for i=1:2])
-
-															)
-
-end 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 
-
-
-
-
-
-function (D::GL_Density)(field::AbstractArray{<:Number,N},
-												 fieldcc::AbstractArray{<:Number,N}=conj(field)
-												 )::ComplexF64	where N 
-
-	@assert all(==(N), field_rank(D))
-
-
-	f::ComplexF64 = 0.0 + 0.0im 
-
-	for (coef,degen_terms) in zip(D.Coeffs,D.Terms)
-
-		for term in degen_terms.Terms 
-
-			q::ComplexF64 = coef*degen_terms.Weight 
-
-			for i in each_field_i(term) 
-
-				q *= field[i...]
-
-			end 
-
-			for i in each_fieldcc_i(term)
-
-				q *= fieldcc[i...]
-
-			end  
-
-			f += q
-
-		end 
-
-	end 
-
-	return f 
-
-end 
-
-
-
+#	function GL_DegenerateTerms(class::Int, 
+#															weight::Float64,
+#															coeffs::AbstractVector{GL_MixedProduct}
+#															)::GL_DegenerateTerms
+#
+#		rank = unique(field_rank.(coeffs))
+#
+#		@assert length(rank)==1 "The coeffs should be for the same fields!"
+#
+#		n = unique(sum.(nr_fields.(coeffs)))
+#
+#		@assert length(n)==1 "The coeffs should have the same order!"
+#
+#		return new(class, weight, coeffs)
+#
+#	end 
+#
+#
+#	function GL_DegenerateTerms(class::Int, 
+#															weight::Float64,
+#															coeffs...
+#															)::GL_DegenerateTerms 
+#
+#		GL_DegenerateTerms(class, weight, Utils.flat(coeffs...))
+#
+#	end 
+#
+#	function GL_DegenerateTerms(#class::Int, 
+#															weight::Float64,
+#															c1::Union{Utils.List,GL_MixedProduct},
+#															coeffs...,
+#															)::GL_DegenerateTerms
+#
+#		GL_DegenerateTerms(1, weight, c1, coeffs...)
+#
+#	end 
+#
+#	function GL_DegenerateTerms(#class::Int, 
+#															#weight::Float64,
+##															coeffs::Vararg{GL_MixedProduct}
+#															c1::Union{Utils.List,GL_MixedProduct},
+#															coeffs...,
+#															)::GL_DegenerateTerms
+#
+#		GL_DegenerateTerms(1, 1.0, c1, coeffs...)
+#
+#	end 
+#
+#	function GL_DegenerateTerms(class::Int, 
+#															#weight::Float64,
+#															c1::Union{Utils.List,GL_MixedProduct},
+#															coeffs...#::Vararg{GL_MixedProduct}
+#															)::GL_DegenerateTerms
+#
+#		GL_DegenerateTerms(class, 1.0, c1, coeffs...)
+#
+#	end 
+#
+#end 
+#
+#
+#field_rank(t::GL_DegenerateTerms)::NTuple{2,Int} = field_rank(first(t.Terms))
+#
+#nr_fields(t::GL_DegenerateTerms)::NTuple{2,Int} = nr_fields(first(t.Terms))
+#
+#
+#
+##===========================================================================#
+##
+##
+##
+##---------------------------------------------------------------------------#
+#
+#
+#struct GL_Density 
+#
+#	Coeffs::Vector{Float64}
+#
+#	Terms::Vector{GL_DegenerateTerms}
+#
+##	FieldRank::NTuple{2,Int}
+#
+##	NrFields::NTuple{2,Int} 
+#
+##	function GL_Density(terms::Vararg{<:GL_DegenerateTerms})::GL_Density
+##
+##		GL_Density([t for t in terms])
+##
+##	end 
+#	
+#
+#	function GL_Density(coeffs::Union{Real,AbstractVector{<:Real}},
+#											terms::Vararg{<:GL_DegenerateTerms})::GL_Density
+#
+#		GL_Density(coeffs, [t for t in terms])
+#
+#	end 
+#
+#
+#
+##	function GL_Density(terms::AbstractVector{GL_DegenerateTerms})::GL_Density
+##
+##		new(ones(length(terms)),terms)
+##
+##	end  
+#
+#	function GL_Density(coeffs::Union{Real,AbstractVector{<:Real}},
+#											terms::AbstractVector{GL_DegenerateTerms}
+#											)
+#
+#		@assert length(coeffs)==length(terms)
+#
+#		r = unique(field_rank.(terms))
+#
+#		@assert length(r)==1 && length(unique(only(r)))==1 "Not same fields"
+#
+#		return new(vcat(coeffs), terms)
+#
+#	end 
+#
+#end 
+#
+#
+#field_rank(d::GL_Density)::NTuple{2,Int} = field_rank(first(d.Terms))
+#
+##===========================================================================#
+##
+##
+##
+##---------------------------------------------------------------------------#
+#
+#
+#
+#
+#function D4h_density_homog_(a::Union{Real,AbstractVector{<:Real}},
+#														b::AbstractVector{<:Real}
+#														)::GL_Density 
+#
+#	GL_Density(vcat(a,b),
+#														GL_DegenerateTerms(1.0, 
+#									[GL_MixedProduct(1,1), GL_MixedProduct(2,2)]),
+#
+#													 GL_DegenerateTerms(1, 1.0, 
+#									[(GL_MixedProduct(rep(rep(i))), GL_MixedProduct(rep(i,other[i]))
+#																			) for i=1:2]),
+#
+#													 GL_DegenerateTerms(2, 0.5,
+#									[GL_MixedProduct(rep(i),rep(other[i])) for i=1:2]),
+#													 
+#													 GL_DegenerateTerms(3, 1.0, GL_MixedProduct(rep(1,2)))
+#														 )
+#
+#end 
+#
+#function D4h_density_grad_(k::AbstractVector{<:Real})::GL_Density
+#	
+#	GL_Density(k,
+#														GL_DegenerateTerms(1, 
+#										[GL_MixedProduct(rep([rep(i)])) for i=1:2]),
+#
+#														GL_DegenerateTerms(2, 
+#										[GL_MixedProduct(rep([(i,other[i])])) for i=1:2]),
+#
+#														GL_DegenerateTerms(3, 
+#										[GL_MixedProduct([rep(i)],[rep(other[i])]) for i=1:2]),
+#
+#														GL_DegenerateTerms(4,
+#										[GL_MixedProduct([(i,other[i])],[(other[i],i)]) for i=1:2]),
+#
+#														GL_DegenerateTerms(5, 
+#										[GL_MixedProduct(rep([(3,i)])) for i=1:2])
+#
+#															)
+#
+#end 
+#
+#
+#
+#
+#
+#
+#
+#
+#function (D::GL_Density)(field::AbstractArray{<:Number,N},
+#												 fieldcc::AbstractArray{<:Number,N}=conj(field)
+#												 )::ComplexF64	where N 
+#
+#	@assert all(==(N), field_rank(D))
+#
+#
+#	f::ComplexF64 = 0.0 + 0.0im 
+#
+#	for (coef,degen_terms) in zip(D.Coeffs,D.Terms)
+#
+#		for term in degen_terms.Terms 
+#
+#			q::ComplexF64 = coef*degen_terms.Weight 
+#
+#			for i in each_field_i(term) 
+#
+#				q *= field[i...]
+#
+#			end 
+#
+#			for i in each_fieldcc_i(term)
+#
+#				q *= fieldcc[i...]
+#
+#			end  
+#
+#			f += q
+#
+#		end 
+#
+#	end 
+#
+#	return f 
+#
+#end 
+#
+#
+#
 
 
 

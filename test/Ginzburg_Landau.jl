@@ -13,204 +13,420 @@ import QuadGK ,Random
 
 #ComputeTasks.get_data_one(t0; mute=false)   
 
-#Random.seed!(561) 
 
 colors = ["brown","red","coral","peru","gold","olive","forestgreen","lightseagreen","dodgerblue","midnightblue","darkviolet","deeppink"] |> Random.shuffle
 	
 
-@testset "struct GL" begin 
+#@testset "struct GL product" begin 
+#
+#	inds = [	1, [1], (1,), [(1,)], ([1],),
+#
+#					 [1,2],(1,2),[(1,),(2,)],([1],[2]),
+#
+#					 [(1,2)],([1,2],),
+#
+#					 [(1,2,3),(2,3,1)], ([1,2,3],[2,3,1]),
+#
+#					 ] 
+#
+#	for i in inds 
+#
+#		GL.GL_Product(rand(), i)
+#
+#	end 
+#
+#end 
 
-	M = GL.parse_inds(1)
+many_inds = 								 [
+								[ 1, [1], (1,), [(1,)], ([1],), ],
+							([1,2],(1,2),[(1,),(2,)],([1],[2])),
+						 ([1,1],),
+								(	[(1,2)],([1,2],) ),
+								[ [(1,2,3),(2,3,1)], ([1,2,3],[2,3,1]) ],
+								[ [(2,3,1),(2,3,1)], ],
+								]
 
-	for i in [
-						1,
-						[1],
-						(1,),
-						[(1,)],
-					 ([1],),
-					 ] 
+many_nr_rank = [(1,1),(2,1),(2,1),(1,2),(2,3),(2,3)]
+
+
+@testset "struct GL product basic" begin  
 	
-		#println() 
+	for (S,inds_) in zip(many_nr_rank,many_inds)
+	
+			Random.seed!(rand(100:500)+Int(10round(time()))+ rand(S)+sum(sum,rand(inds_)))
 
-		M2 = GL.parse_inds(i...)
+			M1 = GL.parse_inds(inds_[1]...)
 		
-		@test M2==M
+			@test (GL.nr_fields(M1),GL.field_rank(M1))==S  
+	
+	
+			P1 = GL.GL_Product(round(rand(),digits=3),M1)
+		
+			for inds in inds_
+			
+				M2 = GL.parse_inds(inds...)
+				
+				@test (GL.nr_fields(M2),GL.field_rank(M2))==S  
 
-		@test GL.nr_fields(M2)==GL.field_rank(M2)==1 
 
 
+
+				@test M2==M1
+		
+				@test GL.same_inds(P1, GL.GL_Product(rand(),inds...))
+				
+		
+			end  
+
+			@test length(unique(GL.each_fieldfactor(P1)))==length(GL.count_unique(P1))
+				
 	end 
 
+end 
 
-	M3  = GL.parse_inds(1,2) 
-
-	for inds in ([1,2],(1,2),[(1,),(2,)],([1],[2]))
-
-		#println() 
+println("\n"); #error() 
 
 
-		M4 = GL.parse_inds(inds...)
 
-		@test M3==M4 
+@testset "struct GL_product derivative" begin  
 
-		@test GL.nr_fields(M4)==2 
-		@test GL.field_rank(M4)==1 
+	for (S,inds_) in zip(many_nr_rank,many_inds)
+	
+			Random.seed!(rand(100:500)+Int(10round(time()))+ rand(S)+sum(sum,rand(inds_)))
 
-	end
+			M1 = GL.parse_inds(inds_[1]...)
+
+			P1 = GL.GL_Product(round(rand(),digits=3),M1)
+		
+			ps1 = [GL.GL_Product(1.0*i, I...) for (i,I) in enumerate(inds_)]
+	
+			ps2 = GL.cumulate(ps1)
+	
+			@test length(ps2)==1 
+			
+			@test GL.same_inds(ps2[1], P1)
+	
+			@test only(ps2).Weight == div(length(inds_)*(length(inds_)+1),2)
 
 
-	M5 = GL.parse_inds((1,2)) 
 
-	for inds in (	[(1,2)],([1,2],) )
+#			println("\n*** Term: ",join(inds_[1],","),"  ",P1.Weight,"  nr_fields=",GL.nr_fields(P1))
+
+			J1,Q1 = GL.derivatives(P1)
+
+			for (j1,q1) in zip(eachcol(J1),Q1)
+
+				@test GL.derivative(P1, j1).Inds==q1.Inds
+				@test GL.derivative(P1, j1).Weight==q1.Weight
+
+			end 
 
 
-		M6 = GL.parse_inds(inds...)
 
-		@test GL.nr_fields(M6)==1 
-		@test GL.field_rank(M6)==2 
 
-		@test M5==M6 
+
+			cu = GL.count_unique(P1)
+
+			for q in Base.product(fill(1:3, GL.field_rank(P1))...)
+
+				q_ = vcat(q...)
+
+				d = GL.derivative(P1, q_)
+				
+				if !any(==(q_),eachcol(M1)) 
+					
+					@test d.Weight==0 
+
+				else 
+
+#					@show q_  d
+
+					@test GL.nr_fields(d)==GL.nr_fields(P1)-1
+
+
+					j1 = findall([c==q_ for c in eachcol(J1)])
+#					j1 = findall(==(q_), eachcol(J1))
+
+
+					@test length(j1)==1
+
+					@test cu[only(j1)][2]*P1.Weight≈d.Weight
+						
+
+
+
+					if GL.nr_fields(d)==0 
+
+						field = rand(ComplexF64, fill(3,GL.field_rank(P1))...)
+
+						@test d(field)≈d.Weight 
+
+					end
+
+#					println()
+				end 
+
+			end
+
+		end  
+	
+	for trial in 1:5
+	
+		Random.seed!(trial+Int(10round(time())))
+	
+		ps = vcat([[GL.GL_Product(10.0^i, inds...) for inds in inds_[Utils.Random_Items(1:length(inds_))]] for (i,inds_) in enumerate(many_inds)]...)
+
+		ps_ = GL.cumulate(Vector{GL.GL_Product}(ps[Random.shuffle(1:length(ps))]))
+
+		@test length(ps_)==length(many_inds)
+
+		@test Set([Int(floor(log10(p.Weight))) for p in ps_]) == Set(1:length(many_inds))
 
 	end 
+end 
+
+	
+println("\n"); 
+
+@testset "D4h GL tensor struct basics" begin 
+
+	for ((n,r),inds) in zip(many_nr_rank,first.(many_inds))
+	
+		Random.seed!(rand(100:500)+Int(10round(time()))+ n+r+sum(sum,inds))
+
+		P1 = GL.GL_Product(round(rand(),digits=3),inds...) 
+		field = rand(ComplexF64, fill(3,GL.field_rank(P1))...)
+
+		T0 = GL.GL_Tensor([P1])
 
 
-	M7 = GL.parse_inds((1,2,3),(2,3,1))
+
+		@test T0(field,[1]) ≈ P1(field)
+
+		J1,Q1 = GL.derivatives(P1) 
 
 
-	for inds in [ [(1,2,3),(2,3,1)], ([1,2,3],[2,3,1]) ] 
+		T1 = GL.GL_Tensor(1.0, J1, Q1) 
 
-		M8 = GL.parse_inds(inds...)
+		for (j1,(i,t)) in zip(GL.each_fieldfactor(J1),T1(field))
 
-		@test GL.nr_fields(M8)==2
-		@test GL.field_rank(M8)==3
+			@test !(T1(field,j1) ≈ 0)
 
-		@test M7==M8
+			@test i==j1 
+
+			@test T1(field,j1)≈t
+
+		end 
+
+		@test T1(field,rand(Int,GL.field_rank(P1))) ≈ 0  
 
 	end 
-
-
 
 end 
 
 
-#println("\n\n"); error() 
 
 
-@testset "D4h GL struct coeff" begin 
+
+
+
+
+
+
+
+
+
+println("\n");error()
+
+@testset "D4h GL mixed product struct basics" begin 
+
+	for ((n,r),inds) in zip(many_nr_rank,first.(many_inds))
+
+		P1 = GL.GL_Product(rand(),inds...)
+
+		for ((ncc,rcc),indscc) in zip(many_nr_rank,first.(many_inds))
+
+			r==rcc || continue   
+
+			P2 = GL.GL_Product(rand(),indscc...)
+
+
+			P = GL.GL_MixedProduct((P1.Weight,inds...),(P2.Weight,indscc...))
+
+			@test only(unique(GL.field_rank(P)))==GL.field_rank(P1)==GL.field_rank(P2)
+
+			@test sum(GL.nr_fields(P))==GL.nr_fields(P1)+GL.nr_fields(P2)
+
+			field = rand(ComplexF64, fill(3,GL.field_rank(P1))...)
+			fieldcc = rand(ComplexF64, fill(3,GL.field_rank(P2))...)
+
+			@test P(field,fieldcc) isa ComplexF64
+
+			P(field,fieldcc) == P.Weight*P1(field)*P2(fieldcc)
+
+			for i=1:GL.nr_fields(P1)
+
+				GL.derivative(P,:field,i)
+
+			end  
+
+			for j=1:GL.nr_fields(P2)
+
+				GL.derivative(P,:fieldcc,j)
+
+			end 
+
+			for field in [:field, :fieldcc]
+
+				field2 = field == :field ? :fieldcc : :field  
+
+#				GL.derivatives(P, field)
+
+				for q in Base.product(fill(1:3, GL.field_rank(P,field))...)
 	
-	D4hdh = GL.D4h_density_homog_(rand(),rand(3))
-
-	for (r,n,(Q1,Q2)) in zip([1,1,2],
-										 [2,4,2],
-										 [(GL.D4h_homog_ord2, D4hdh),
-											(GL.D4h_homog_ord4, 
-											 GL.GL_Density(rand(3),D4hdh.Terms[2:end])
-											 ),
-											(GL.D4h_grad_ord2, 
-											 GL.D4h_density_grad_(rand(5)))
-											])
-
-#		(r,n) == (1,2) || continue 
-#		(r,n) == (1,4) || continue 
-
-#		r==2 || continue 
-
-		#println("\nr=$r")
-
-		for (i,(P,P_)) in enumerate(zip(Q1,Q2.Terms))
-
-
-			@test P_.EnergyClass==i
+					q_ = vcat(q...)
 	
-			@test P_.Weight == P[1]
+					deriv = GL.derivative(P, field, q_) 
 
+					for d in deriv 
+						
+						@test GL.nr_fields(d,field)==GL.nr_fields(P,field)-1 
 
-
-			for q_ in P[2]
-
-
-				A,B = [hcat((vcat(qi...) for qi in q)...) for q in q_]
-				
-				#@show size(A) size(P_.coeffs[1].Inds)
-
-				tests = map(P_.Terms) do c #might not be in the same order 
-
-#					@show n GL.nr_fields(c) 
-
-#					@show c GL.field_rank(c) GL.nr_fields(c)
-
-					@test GL.field_rank(c)==(r,r)
-
-					@test sum(GL.nr_fields(c))==n
-					
-					@test size(c.Inds)==size(c.IndsCC) 
-
-					if size(A)==size(c.Inds)
-
-						return A==c.Inds && B==c.IndsCC 
-
-					elseif size(A')==size(c.Inds)
-
-						return A'==c.Inds && B==c.IndsCC'
-
-					else 
-
-						error()
+						@test GL.nr_fields(d,field2)==GL.nr_fields(P,field2)
 
 					end 
 
+	
 				end 
-			
-			if !any(tests)
 
-#				@show i A B 
-#				continue 
+			end 	
 
-			end 
-
-			@test any(tests)
-
-
-			end 
-
-#			@test size(tests,1)==size(tests,2)
-
-
-
-
-
-		end 	
-	end  
-
-
-end 
-
-
-@testset "GL struct: compare densities" begin 
-
-	for trial in 1:10
-	
-		D = rand(ComplexF64,3,2)
-	
-		eta = rand(ComplexF64,2)
-	
-		K = rand(5) 
-	
-		a = rand(1) 
-	
-		b = rand(3) 
-
-		@test GL.D4h_density_homog(eta,a,b)≈GL.D4h_density_homog_(a,b)(eta)
-		@show GL.D4h_density_homog_(a,b)(eta)
-		
-		@test GL.D4h_density_grad(D,K)≈GL.D4h_density_grad_(K)(D)
-		@show GL.D4h_density_grad(D,K)
+		end 
 
 	end 
 
 end 
 
+println("\n")
 
+
+
+
+
+
+#	D4hdh = GL.D4h_density_homog_(rand(),rand(3))
+#
+#	for (r,n,(Q1,Q2)) in zip([1,1,2],
+#										 [2,4,2],
+#										 [(GL.D4h_homog_ord2, D4hdh),
+#											(GL.D4h_homog_ord4, 
+#											 GL.GL_Density(rand(3),D4hdh.Terms[2:end])
+#											 ),
+#											(GL.D4h_grad_ord2, 
+#											 GL.D4h_density_grad_(rand(5)))
+#											])
+#
+##		(r,n) == (1,2) || continue 
+##		(r,n) == (1,4) || continue 
+#
+##		r==2 || continue 
+#
+#		#println("\nr=$r")
+#
+#		for (i,(P,P_)) in enumerate(zip(Q1,Q2.Terms))
+#
+#
+#			@test P_.EnergyClass==i
+#	
+#			@test P_.Weight == P[1]
+#
+#
+#
+#			for q_ in P[2]
+#
+#
+#				A,B = [hcat((vcat(qi...) for qi in q)...) for q in q_]
+#				
+#				#@show size(A) size(P_.coeffs[1].Inds)
+#
+#				tests = map(P_.Terms) do c #might not be in the same order 
+#
+##					@show n GL.nr_fields(c) 
+#
+##					@show c GL.field_rank(c) GL.nr_fields(c)
+#
+#					@test GL.field_rank(c)==(r,r)
+#
+#					@test sum(GL.nr_fields(c))==n
+#					
+#					@test size(c.Inds)==size(c.IndsCC) 
+#
+#					if size(A)==size(c.Inds)
+#
+#						return A==c.Inds && B==c.IndsCC 
+#
+#					elseif size(A')==size(c.Inds)
+#
+#						return A'==c.Inds && B==c.IndsCC'
+#
+#					else 
+#
+#						error()
+#
+#					end 
+#
+#				end 
+#			
+#			if !any(tests)
+#
+##				@show i A B 
+##				continue 
+#
+#			end 
+#
+#			@test any(tests)
+#
+#
+#			end 
+#
+##			@test size(tests,1)==size(tests,2)
+#
+#
+#
+#
+#
+#		end 	
+#	end  
+
+
+#end 
+#
+#
+#@testset "GL struct: compare densities" begin 
+#
+#	for trial in 1:10
+#	
+#		D = rand(ComplexF64,3,2)
+#	
+#		eta = rand(ComplexF64,2)
+#	
+#		K = rand(5) 
+#	
+#		a = rand(1) 
+#	
+#		b = rand(3) 
+#
+#		@test GL.D4h_density_homog(eta,a,b)≈GL.D4h_density_homog_(a,b)(eta)
+#		@show GL.D4h_density_homog_(a,b)(eta)
+#		
+#		@test GL.D4h_density_grad(D,K)≈GL.D4h_density_grad_(K)(D)
+#		@show GL.D4h_density_grad(D,K)
+#
+#	end 
+#
+#end 
+#
+#
 
 #
 #
