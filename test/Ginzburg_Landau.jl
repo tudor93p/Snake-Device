@@ -37,16 +37,22 @@ colors = ["brown","red","coral","peru","gold","olive","forestgreen","lightseagre
 #
 #end 
 
-many_inds = 								 [
-								[ 1, [1], (1,), [(1,)], ([1],), ],
+
+rand_field(p) = rand(ComplexF64, fill(3,GL.field_rank(p))...)
+
+
+many_inds = [ [ 1, [1], (1,), [(1,)], ([1],), ],
 							([1,2],(1,2),[(1,),(2,)],([1],[2])),
-						 ([1,1],),
+						 ([1,3],),
 								(	[(1,2)],([1,2],) ),
 								[ [(1,2,3),(2,3,1)], ([1,2,3],[2,3,1]) ],
-								[ [(2,3,1),(2,3,1)], ],
+								[ [(2,1,3),(2,1,3)], ],
 								]
 
-many_nr_rank = [(1,1),(2,1),(2,1),(1,2),(2,3),(2,3)]
+
+many_nr_rank = [(1,1),(2,1), (2,1), (1,2),(2,3), (2,3)
+								]
+
 
 
 @testset "struct GL product basic" begin  
@@ -56,11 +62,12 @@ many_nr_rank = [(1,1),(2,1),(2,1),(1,2),(2,3),(2,3)]
 			Random.seed!(rand(100:500)+Int(10round(time()))+ rand(S)+sum(sum,rand(inds_)))
 
 			M1 = GL.parse_inds(inds_[1]...)
-		
+	
 			@test (GL.nr_fields(M1),GL.field_rank(M1))==S  
 	
-	
 			P1 = GL.GL_Product(round(rand(),digits=3),M1)
+			
+			@test !GL.small_weight(P1)
 		
 			for inds in inds_
 			
@@ -84,7 +91,9 @@ many_nr_rank = [(1,1),(2,1),(2,1),(1,2),(2,3),(2,3)]
 
 end 
 
-println("\n"); #error() 
+println("\n"); 
+
+
 
 
 
@@ -116,11 +125,9 @@ println("\n"); #error()
 
 			for (j1,q1) in zip(eachcol(J1),Q1)
 
-				@test GL.derivative(P1, j1).Inds==q1.Inds
-				@test GL.derivative(P1, j1).Weight==q1.Weight
+				@test GL.derivative(P1, j1)==q1 
 
 			end 
-
 
 
 
@@ -185,8 +192,90 @@ println("\n"); #error()
 	end 
 end 
 
+println("\n");
+
+
+@testset "struct GL mixed product basic + deriv" begin  
+
+	for n=1:3  
+
+		for item in Base.product([first.(many_inds) for i=1:n]...)
+
+			prods = [GL.GL_Product(rand(),it...) for it in item]
+
+			w = rand() 
+
+			P = GL.GL_MixedProduct(w, prods)
+
+			@test !GL.small_weight(P)
+
+			fields = rand_field.(prods)
+
+			a1 = prod([p(f) for (p,f) in zip(prods,fields)])
+			
+			A2 = P(fields...)
+
+			A1 = w*a1 
+
+			@test A1≈A2 
+			
+			a3 = prod(prods)(fields...)
+
+			@test a1≈a3 
+		
+			A4 = (w*prod(prods))(fields...)
+
+			@test A1≈A4
+
+			A5 = prod(vcat(prods[1]*w,prods[2:end]))(fields...)
+
+			@test A1≈A5
+
+
+			i0 = rand(1:n) 
+
+			P2 = GL.GL_MixedProduct_sameFields(P, prods[i0], i0) 
+
+			@test P2(fields...) ≈ A1* prods[i0](fields[i0])
+
 	
-println("\n"); 
+#			@show P 
+
+			for deriv_field in 1:n 
+				
+				J1,Q1 = GL.derivatives(P,deriv_field)
+
+				for (j1,q1) in zip(eachcol(J1),Q1)
+
+					D1 = only(GL.cumulate([GL.derivative(P, deriv_field, i) for i=1:GL.nr_fields(P, deriv_field) if GL.select_fieldfactor(P.Factors[deriv_field], i)==j1]))
+
+					@test D1==q1 
+
+
+				end 
+
+			end 
+
+
+	#for (S,inds_) in zip(many_nr_rank,many_inds)
+	
+#			Random.seed!(rand(100:500)+Int(10round(time()))+ rand(S)+sum(sum,rand(inds_)))
+
+
+		end 
+
+	end 
+end 
+
+
+println("\n");#error() 
+
+
+
+
+
+
+println("\n"); error()
 
 @testset "D4h GL tensor struct basics" begin 
 
@@ -194,7 +283,8 @@ println("\n");
 	
 		Random.seed!(rand(100:500)+Int(10round(time()))+ n+r+sum(sum,inds))
 
-		P1 = GL.GL_Product(round(rand(),digits=3),inds...) 
+		P1 = GL.GL_Product(round(rand(),digits=3),inds...)  
+
 		field = rand(ComplexF64, fill(3,GL.field_rank(P1))...)
 
 		T0 = GL.GL_Tensor([P1])
