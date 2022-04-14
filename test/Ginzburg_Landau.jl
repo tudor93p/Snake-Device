@@ -53,13 +53,44 @@ many_inds = [ [ 1, [1], (1,), [(1,)], ([1],), ],
 many_nr_rank = [(1,1),(2,1), (2,1), (1,2),(2,3), (2,3)
 								]
 
+#onehot(n::Int, i::Int)::Vector{Float64} = onehot(n, 1.0, i)  
+#
+#function onehot(n::Int, val::T, i::Int)::Vector{T} where T<:Number  
+#
+#	setindex!(zeros(T,n), val, i)
+#
+#end 
 
+function onehot(p, step, q_)
+
+	setindex!(zeros(ComplexF64, fill(3,GL.field_rank(p))...), step, q_...) 
+
+end 
+#flat_prod(ns) = collect(Base.Iterators.flatten(Base.product(ns...)))
+flat_prod(ns) = collect(Base.product(ns...))[:]
+
+
+rand_items(it, m::Int) = Utils.Random_Items(it, min(m,length(it)))  
+
+flat_prod(ns, m::Int) = rand_items(flat_prod(ns), m)
+
+
+function combs(n::Int)#,m::Int)
+
+#	Random.seed!(rand(100:500)+Int(10round(time()))+ n)
+
+	filter(issorted, flat_prod(fill(axes(many_inds,1), n)))
+
+end 
+
+combs(n::Int, m::Int) = rand_items(combs(n), m)
+														 
 
 @testset "struct GL product basic" begin  
 	
 	for (S,inds_) in zip(many_nr_rank,many_inds)
 	
-			Random.seed!(rand(100:500)+Int(10round(time()))+ rand(S)+sum(sum,rand(inds_)))
+#			Random.seed!(rand(100:500)+Int(10round(time()))+ rand(S)+sum(sum,rand(inds_)))
 
 			M1 = GL.parse_inds(inds_[1]...)
 	
@@ -80,7 +111,7 @@ many_nr_rank = [(1,1),(2,1), (2,1), (1,2),(2,3), (2,3)
 
 				@test M2==M1
 		
-				@test GL.same_inds(P1, GL.GL_Product(rand(),inds...))
+				@test GL.same_products(P1, GL.GL_Product(rand(),inds...))
 				
 		
 			end  
@@ -101,7 +132,7 @@ println("\n");
 
 	for (S,inds_) in zip(many_nr_rank,many_inds)
 	
-			Random.seed!(rand(100:500)+Int(10round(time()))+ rand(S)+sum(sum,rand(inds_)))
+#			Random.seed!(rand(100:500)+Int(10round(time()))+ rand(S)+sum(sum,rand(inds_)))
 
 			M1 = GL.parse_inds(inds_[1]...)
 
@@ -113,7 +144,7 @@ println("\n");
 	
 			@test length(ps2)==1 
 			
-			@test GL.same_inds(ps2[1], P1)
+			@test GL.same_products(ps2[1], P1)
 	
 			@test only(ps2).Weight == div(length(inds_)*(length(inds_)+1),2)
 
@@ -139,10 +170,13 @@ println("\n");
 				q_ = vcat(q...)
 
 				d = GL.derivative(P1, q_)
-				
+			
+
+				@test GL.test_derivative(P1, d, rand_field(P1), step -> onehot(P1, step, q_)) 
+
 				if !any(==(q_),eachcol(M1)) 
 					
-					@test d.Weight==0 
+					@test GL.small_weight(d)
 
 				else 
 
@@ -154,13 +188,13 @@ println("\n");
 					j1 = findall([c==q_ for c in eachcol(J1)])
 #					j1 = findall(==(q_), eachcol(J1))
 
-
 					@test length(j1)==1
 
 					@test cu[only(j1)][2]*P1.Weight≈d.Weight
+
+
+
 						
-
-
 
 					if GL.nr_fields(d)==0 
 
@@ -179,7 +213,7 @@ println("\n");
 	
 	for trial in 1:5
 	
-		Random.seed!(trial+Int(10round(time())))
+#		Random.seed!(trial+Int(10round(time())))
 	
 		ps = vcat([[GL.GL_Product(10.0^i, inds...) for inds in inds_[Utils.Random_Items(1:length(inds_))]] for (i,inds_) in enumerate(many_inds)]...)
 
@@ -195,17 +229,24 @@ end
 println("\n");
 
 
+
+
 @testset "struct GL mixed product basic + deriv" begin  
 
-	for n=1:3  
+	for n=1:5
+#
+#		@show n 
 
-		for item in Base.product([first.(many_inds) for i=1:n]...)
+		for iii in combs(n, 10)
 
-			prods = [GL.GL_Product(rand(),it...) for it in item]
+			ns = Utils.Random_Items('a':'z',length(iii))
+
+			prods = [GL.GL_Product(fn, rand(),rand(many_inds[i])...) for (fn,i) in zip(ns,iii)]
 
 			w = rand() 
 
-			P = GL.GL_MixedProduct(w, prods)
+
+			P = GL.GL_MixedProduct(w, prods) 
 
 			@test !GL.small_weight(P)
 
@@ -243,11 +284,38 @@ println("\n");
 
 			for deriv_field in 1:n 
 				
-				J1,Q1 = GL.derivatives(P,deriv_field)
+				J1,Q1 = GL.derivatives(P,deriv_field) 
+
+				p7 = P.Factors[deriv_field] 
+
+				for (factor,q_) in GL.enumerate_fieldfactors(p7)
+
+#					D2 = only(Q1[[q_==j1 for j1 in GL.each_fieldfactor(J1)]])
+
+					D = GL.derivative(P, deriv_field, q_)#factor) degeneracy!
+
+					fields = rand_field.(P.Factors)
+
+					z(x) = [i4==deriv_field ? x : x0 for (i4,x0) in enumerate(fields)]
+
+
+					t = GL.test_derivative(x->P(z(x)...),
+																	 x->D(z(x)...),
+																	 rand_field(p7),
+																	 step -> onehot(p7, step, q_))  
+					@test t 
+					
+				end 
+
+
+				
 
 				for (j1,q1) in zip(eachcol(J1),Q1)
 
-					D1 = only(GL.cumulate([GL.derivative(P, deriv_field, i) for i=1:GL.nr_fields(P, deriv_field) if GL.select_fieldfactor(P.Factors[deriv_field], i)==j1]))
+			
+					X = [GL.derivative(P, deriv_field, i) for i in findall(j1, P.Factors[deriv_field])]
+
+					D1 = only(GL.cumulate(X))
 
 					@test D1==q1 
 
@@ -268,80 +336,35 @@ println("\n");
 end 
 
 
-println("\n");#error() 
 
 
 
+println("\n")#;error()
 
-
-
-println("\n"); error()
-
-@testset "D4h GL tensor struct basics" begin 
-
-	for ((n,r),inds) in zip(many_nr_rank,first.(many_inds))
-	
-		Random.seed!(rand(100:500)+Int(10round(time()))+ n+r+sum(sum,inds))
-
-		P1 = GL.GL_Product(round(rand(),digits=3),inds...)  
-
-		field = rand(ComplexF64, fill(3,GL.field_rank(P1))...)
-
-		T0 = GL.GL_Tensor([P1])
-
-
-
-		@test T0(field,[1]) ≈ P1(field)
-
-		J1,Q1 = GL.derivatives(P1) 
-
-
-		T1 = GL.GL_Tensor(1.0, J1, Q1) 
-
-		for (j1,(i,t)) in zip(GL.each_fieldfactor(J1),T1(field))
-
-			@test !(T1(field,j1) ≈ 0)
-
-			@test i==j1 
-
-			@test T1(field,j1)≈t
-
-		end 
-
-		@test T1(field,rand(Int,GL.field_rank(P1))) ≈ 0  
-
-	end 
-
-end 
-
-
-
-
-
-
-
-
-
-
-
-
-
-println("\n");error()
-
-@testset "D4h GL mixed product struct basics" begin 
+@testset "D4h GL mixed product struct - old " begin 
 
 	for ((n,r),inds) in zip(many_nr_rank,first.(many_inds))
 
-		P1 = GL.GL_Product(rand(),inds...)
+		P1 = GL.GL_Product("eta",rand(),inds...)
 
 		for ((ncc,rcc),indscc) in zip(many_nr_rank,first.(many_inds))
 
 			r==rcc || continue   
 
-			P2 = GL.GL_Product(rand(),indscc...)
+			P2 = GL.GL_Product("eta*",rand(),indscc...)
 
 
-			P = GL.GL_MixedProduct((P1.Weight,inds...),(P2.Weight,indscc...))
+			P = GL.GL_MixedProduct(("eta","eta*"), P1, P2)
+			
+			#(P1.Weight,inds...),(P2.Weight,indscc...))
+
+			@test GL.field_name(2P,1)=="eta" 
+			@test GL.field_name(3P,1)=="eta" 
+			@test GL.field_name(4P*P1,1)=="eta" 
+			@test GL.field_name(5P1*P,1)=="eta" 
+			@test GL.field_name(6P2*P,1)=="eta" 
+			@test GL.field_name(7P*P2,1)=="eta"  
+			@test GL.field_name(8P,2)=="eta*"
 
 			@test only(unique(GL.field_rank(P)))==GL.field_rank(P1)==GL.field_rank(P2)
 
@@ -356,36 +379,38 @@ println("\n");error()
 
 			for i=1:GL.nr_fields(P1)
 
-				GL.derivative(P,:field,i)
+				GL.derivative(P,1,i)
 
 			end  
 
 			for j=1:GL.nr_fields(P2)
 
-				GL.derivative(P,:fieldcc,j)
+				GL.derivative(P,2,j)
 
 			end 
 
-			for field in [:field, :fieldcc]
-
-				field2 = field == :field ? :fieldcc : :field  
-
-#				GL.derivatives(P, field)
+			for (field,field2) in [(1,2),(2,1)]#in [:field, :fieldcc]
 
 				for q in Base.product(fill(1:3, GL.field_rank(P,field))...)
 	
 					q_ = vcat(q...)
 	
-					deriv = GL.derivative(P, field, q_) 
+					d = GL.derivative(P, field, q_)  
+			
+					@test GL.field_name(d,1)=="eta" 
+					@test GL.field_name(d,2)=="eta*"
 
-					for d in deriv 
-						
-						@test GL.nr_fields(d,field)==GL.nr_fields(P,field)-1 
 
-						@test GL.nr_fields(d,field2)==GL.nr_fields(P,field2)
+					if q_ in P.Factors[field] 
+
+						@test GL.nr_fields(d,field)+1==GL.nr_fields(P,field)==[n,ncc][field]
+
+						@test GL.nr_fields(d,field2)==GL.nr_fields(P,field2)==[n,ncc][field2]
+					else 
+
+						@test GL.small_weight(d)
 
 					end 
-
 	
 				end 
 
@@ -397,11 +422,171 @@ println("\n");error()
 
 end 
 
-println("\n")
 
 
 
 
+
+println("\n"); 
+
+
+
+
+
+
+
+
+@testset "D4h GL scalar struct basics" begin 
+
+	for nr_terms in 1:5, term_length in flat_prod(fill(1:5,nr_terms),5)
+
+		#@show term_length
+
+		for iiiii in flat_prod(combs.(term_length,10), 15)
+
+			possib_names = [Utils.Random_Items(k,rand(1:length(k))) for k in [
+												["A","B"],
+											["CC","DD"],
+											["EEE","FFF"],
+											]]
+
+
+			prods = map(iiiii) do iii
+
+				map(iii) do i 
+
+					w = round(rand(),digits=3)
+					
+					I = rand(many_inds[i])
+					
+					fn = rand(possib_names[GL.field_rank(GL.GL_Product(I...))])
+
+					return GL.GL_Product(fn, w, I...)
+
+				end 
+
+			end 
+
+			@test nr_terms==length(prods)==length(iiiii)
+
+			for (L1,L2) in zip(length.(prods),term_length)
+
+				@test L1==L2 
+
+			end 
+
+
+			terms = [GL.GL_MixedProduct(round(rand(),digits=3), vcat(p...)) for p in prods]
+
+
+			for ps in prods 
+
+				t1 = GL.GL_MixedProduct(round(rand(),digits=3), vcat(ps...)) 
+				
+				t2 = GL.GL_MixedProduct(round(rand(),digits=3), reverse(ps)...)
+			
+				if !all(GL.same_products(z1,z2) for (z1,z2) in zip(t1.Factors, t2.Factors)) 
+
+					@test GL.same_products(t1,t2)
+
+				end 
+	
+			end 
+			
+			
+			S = GL.GL_Scalar(round(rand(),digits=3),terms)
+			
+			@test S==GL.GL_Scalar(S.Weight, terms...)
+
+			@test allunique(GL.field_name(S))
+
+#			@show allunique(mapreduce(GL.field_name, vcat, terms))
+
+			for (i,t) in zip(S.FieldDistrib,S.Terms)
+
+				@test GL.field_name(S)[i]==GL.field_name(t)
+
+			end 
+
+
+			reps = sum(1:length(S.Terms)-1; init=0) do i 
+
+				sum(i+1:length(S.Terms); init=0) do j 
+
+					length(intersect(GL.field_name(S, i),GL.field_name(S, j)))
+
+				end 
+
+			end   
+
+
+
+
+			fields = Dict()
+
+			for (rk,pn) in enumerate(possib_names)
+
+				for n in pn 
+
+					fields[n] = rand(ComplexF64, fill(3,rk)...)
+
+				end 
+
+			end 
+			
+			val1 = S((fields[k] for k in GL.field_name(S))...)
+
+			val2 = sum(zip(prods,terms)) do (ps,term)
+
+				P = GL.GL_MixedProduct(term.Weight, (ps[i] for i in Random.shuffle(reverse(1:length(ps))))...)
+
+				@test P==term 
+
+
+				ft = (fields[k] for k in GL.field_name(term))
+
+
+				@test term(ft...)≈P((fields[k] for k in GL.field_name(P))...)
+
+				return (term*S.Weight)(ft...)
+
+			end 
+
+
+			@test val1≈val2 	
+
+
+			@test +(terms...) isa GL.GL_Scalar
+			
+			@test sum(terms) isa GL.GL_Scalar
+
+			@test sum(Terms)*S.Weight == S 
+
+			@test S+S == 2S 
+	
+#
+#		J1,Q1 = GL.derivatives(P1) 
+#
+#
+#		T1 = GL.GL_Tensor(1.0, J1, Q1) 
+#
+#		for (j1,(i,t)) in zip(GL.each_fieldfactor(J1),T1(field))
+#
+#			@test !(T1(field,j1) ≈ 0)
+#
+#			@test i==j1 
+#
+#			@test T1(field,j1)≈t
+#
+#		end 
+#
+#		@test T1(field,rand(Int,GL.field_rank(P1))) ≈ 0  
+#
+		end 
+
+	end 
+
+end 
 
 
 #	D4hdh = GL.D4h_density_homog_(rand(),rand(3))
