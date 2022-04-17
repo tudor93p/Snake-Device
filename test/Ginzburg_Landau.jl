@@ -37,6 +37,7 @@ colors = ["brown","red","coral","peru","gold","olive","forestgreen","lightseagre
 #
 #end 
 
+rand_weight() = rand(0:3)/10
 
 rand_field(p) = rand(ComplexF64, fill(3,GL.field_rank(p))...)
 
@@ -86,19 +87,25 @@ end
 combs(n::Int, m::Int) = rand_items(combs(n), m)
 														 
 
-@testset "struct GL product basic" begin  
+@testset "struct GL product basic" begin   
+
+	@test !GL.proportional(GL.GL_Product([1 1]),GL.GL_Product([1 2]))
+
+
 	
 	for (S,inds_) in zip(many_nr_rank,many_inds)
-	
+
+#		break 
+
 #			Random.seed!(rand(100:500)+Int(10round(time()))+ rand(S)+sum(sum,rand(inds_)))
 
 			M1 = GL.parse_inds(inds_[1]...)
 	
 			@test (GL.nr_fields(M1),GL.field_rank(M1))==S  
 	
-			P1 = GL.GL_Product(round(rand(),digits=3),M1)
+			P1 = GL.GL_Product(rand_weight(),M1)
 			
-			@test !GL.small_weight(P1)
+			!GL.small_weight(P1)
 		
 			for inds in inds_
 			
@@ -111,7 +118,7 @@ combs(n::Int, m::Int) = rand_items(combs(n), m)
 
 				@test M2==M1
 		
-				@test GL.same_products(P1, GL.GL_Product(rand(),inds...))
+				@test GL.proportional(P1, GL.GL_Product(rand_weight(),inds...))
 				
 		
 			end  
@@ -130,21 +137,38 @@ println("\n");
 
 @testset "struct GL_product derivative" begin  
 
-	for (S,inds_) in zip(many_nr_rank,many_inds)
+	for (S,inds_) in zip(many_nr_rank,many_inds) 
+
+#		break
 	
 #			Random.seed!(rand(100:500)+Int(10round(time()))+ rand(S)+sum(sum,rand(inds_)))
 
 			M1 = GL.parse_inds(inds_[1]...)
 
-			P1 = GL.GL_Product(round(rand(),digits=3),M1)
+			P1 = GL.GL_Product(rand_weight(),M1)
 		
 			ps1 = [GL.GL_Product(1.0*i, I...) for (i,I) in enumerate(inds_)]
-	
+
+#			@show length(ps1) 
 			ps2 = GL.cumulate(ps1)
-	
+
+			ps3 = GL.cumulate_(ps1) 
+
+#			@show length(ps2) 
+#			@time GL.cumulate(ps1)
+			
+			@test GL.has_disjoint_pairs(==, ps2, ps3)
+
+
+#			@show GL.cumulate_categories(ps1)
+#			@time GL.cumulate_categories(ps1)
+
+#			@show length(GL.cumulate_(ps1))
+#			@time length(GL.cumulate_(ps1));
+
 			@test length(ps2)==1 
 			
-			@test GL.same_products(ps2[1], P1)
+			@test GL.proportional(ps2[1], P1)
 	
 			@test only(ps2).Weight == div(length(inds_)*(length(inds_)+1),2)
 
@@ -233,7 +257,14 @@ println("\n");
 
 @testset "struct GL mixed product basic + deriv" begin  
 
-	for n=1:5
+	@test !GL.proportional(GL.GL_MixedProduct(GL.GL_Product([1 1])),
+													GL.GL_MixedProduct(GL.GL_Product([1 2])))
+
+
+	for n=1:3
+
+#		break 
+
 #
 #		@show n 
 
@@ -241,14 +272,14 @@ println("\n");
 
 			ns = Utils.Random_Items('a':'z',length(iii))
 
-			prods = [GL.GL_Product(fn, rand(),rand(many_inds[i])...) for (fn,i) in zip(ns,iii)]
+			prods = [GL.GL_Product(fn, rand_weight(), rand(many_inds[i])...) for (fn,i) in zip(ns,iii)]
 
-			w = rand() 
+			w = rand_weight()
 
 
 			P = GL.GL_MixedProduct(w, prods) 
 
-			@test !GL.small_weight(P)
+			!GL.small_weight(P)
 
 			fields = rand_field.(prods)
 
@@ -258,7 +289,7 @@ println("\n");
 
 			A1 = w*a1 
 
-			@test A1≈A2 
+			@test GL.same_weight(A1,A2)
 			
 			a3 = prod(prods)(fields...)
 
@@ -266,18 +297,18 @@ println("\n");
 		
 			A4 = (w*prod(prods))(fields...)
 
-			@test A1≈A4
+			@test GL.same_weight(A1,A4)
 
 			A5 = prod(vcat(prods[1]*w,prods[2:end]))(fields...)
 
-			@test A1≈A5
+			@test GL.same_weight(A1,A5)
 
 
 			i0 = rand(1:n) 
 
 			P2 = GL.GL_MixedProduct_sameFields(P, prods[i0], i0) 
 
-			@test P2(fields...) ≈ A1* prods[i0](fields[i0])
+			@test GL.same_weight(P2(fields...),A1* prods[i0](fields[i0]))
 
 	
 #			@show P 
@@ -313,11 +344,20 @@ println("\n");
 				for (j1,q1) in zip(eachcol(J1),Q1)
 
 			
-					X = [GL.derivative(P, deriv_field, i) for i in findall(j1, P.Factors[deriv_field])]
+					X = [GL.derivative(P, deriv_field, i) for i in findall(j1, P.Factors[deriv_field])] 
+					
+					D1 = GL.cumulate(X)
 
-					D1 = only(GL.cumulate(X))
+					if length(D1) == 1 
 
-					@test D1==q1 
+						@test only(D1)==q1 
+
+					else 
+
+
+						@test all(GL.small_weight,X)
+
+					end 
 
 
 				end 
@@ -338,6 +378,7 @@ end
 
 
 
+#error() 
 
 println("\n")#;error()
 
@@ -345,13 +386,15 @@ println("\n")#;error()
 
 	for ((n,r),inds) in zip(many_nr_rank,first.(many_inds))
 
-		P1 = GL.GL_Product("eta",rand(),inds...)
+#		break 
+
+P1 = GL.GL_Product("eta",rand_weight(),inds...)
 
 		for ((ncc,rcc),indscc) in zip(many_nr_rank,first.(many_inds))
 
 			r==rcc || continue   
 
-			P2 = GL.GL_Product("eta*",rand(),indscc...)
+			P2 = GL.GL_Product("eta*",rand_weight(),indscc...)
 
 
 			P = GL.GL_MixedProduct(("eta","eta*"), P1, P2)
@@ -373,7 +416,7 @@ println("\n")#;error()
 			field = rand(ComplexF64, fill(3,GL.field_rank(P1))...)
 			fieldcc = rand(ComplexF64, fill(3,GL.field_rank(P2))...)
 
-			@test P(field,fieldcc) isa ComplexF64
+			@test P(field,fieldcc) isa Number
 
 			P(field,fieldcc) == P.Weight*P1(field)*P2(fieldcc)
 
@@ -430,15 +473,31 @@ end
 println("\n"); 
 
 
+function pr(n::AbstractString,s2)
+
+	println("\n*** $n ***")
+
+	for k in propertynames(s2)
+
+		println("$k: ",getproperty(s2,k))
+
+	end 
+
+	applicable(GL.weight, s2) && 	@show GL.weight(s2)
 
 
+	println() 
+
+end 
 
 
 
 
 @testset "D4h GL scalar struct basics" begin 
 
-	for nr_terms in 1:5, term_length in flat_prod(fill(1:5,nr_terms),5)
+	Random.seed!(1)
+
+	for nr_terms in 1:3, term_length in flat_prod(fill(1:3,nr_terms),5)
 
 		#@show term_length
 
@@ -455,7 +514,7 @@ println("\n");
 
 				map(iii) do i 
 
-					w = round(rand(),digits=3)
+					w = rand_weight() 
 					
 					I = rand(many_inds[i])
 					
@@ -476,25 +535,25 @@ println("\n");
 			end 
 
 
-			terms = [GL.GL_MixedProduct(round(rand(),digits=3), vcat(p...)) for p in prods]
+			terms = [GL.GL_MixedProduct(rand_weight(), vcat(p...)) for p in prods]
 
 
 			for ps in prods 
 
-				t1 = GL.GL_MixedProduct(round(rand(),digits=3), vcat(ps...)) 
+				t1 = GL.GL_MixedProduct(rand_weight(), vcat(ps...)) 
 				
-				t2 = GL.GL_MixedProduct(round(rand(),digits=3), reverse(ps)...)
+				t2 = GL.GL_MixedProduct(rand_weight(), reverse(ps)...)
 			
-				if !all(GL.same_products(z1,z2) for (z1,z2) in zip(t1.Factors, t2.Factors)) 
+				if !all(GL.proportional(z1,z2) for (z1,z2) in zip(t1.Factors, t2.Factors)) 
 
-					@test GL.same_products(t1,t2)
+					@test GL.proportional(t1,t2)
 
 				end 
 	
 			end 
+		
 			
-			
-			S = GL.GL_Scalar(round(rand(),digits=3),terms)
+			S = GL.GL_Scalar(rand_weight(), terms)
 			
 			@test S==GL.GL_Scalar(S.Weight, terms...)
 
@@ -553,16 +612,166 @@ println("\n");
 			end 
 
 
-			@test val1≈val2 	
+			@test GL.same_weight(val1, val2)
 
-
-			@test +(terms...) isa GL.GL_Scalar
+			s1 = +(terms...) 
 			
-			@test sum(terms) isa GL.GL_Scalar
+			@test s1 isa GL.GL_Scalar
+		
+			s2 = sum(terms) 
+			
+			@test s2 isa GL.GL_Scalar
 
-			@test sum(Terms)*S.Weight == S 
+			@test s2==s1 
 
-			@test S+S == 2S 
+			s3 = sum(S.Terms)
+
+			@test s3 isa GL.GL_Scalar 
+
+			GL.small_weight(S.Weight) || @test GL.equal_prods(s2,s3)
+			
+			
+			if !GL.small_weight(S.Weight) && !GL.equal_prods(s2,s3)
+
+
+
+					println("\n --- Terms --- ")
+	
+				pr.("t".*string.(1:length(terms)),terms)
+
+				pr("s1",s1)
+				pr("s2",s2)
+				pr("s3",s3)
+			
+				pr("S",S)
+			pr.("S Term ".*string.(1:length(S)),S.Terms)
+
+				error()
+
+			end 
+
+
+
+			continue 
+
+		
+			S3  = s3*S.Weight 
+
+			ss3t = [GL.has_disjoint_pairs(==, S.Terms, S3.Terms),
+							GL.same_weight(S.Weight,S3.Weight)]
+
+			@test GL.equal_prods(S,S3)
+			
+			if !(GL.equal_prods(S,S3))
+		
+				error()
+
+#			if S3!= S 
+
+				#	@assert length(terms) ==2 
+	
+					println("\n --- Terms --- ")
+	
+				pr.("t".*string.(1:length(terms)),terms)
+	
+	
+				@show S.Weight S3.Weight 
+	
+				@show GL.nr_fields.(terms)
+	
+				@show GL.field_rank.(terms)
+
+				println() 
+
+				for i=1:nr_terms,j=i+1:nr_terms 
+
+					@show (i,j)
+					
+					@show GL.same_fields(terms[i],terms[j])
+					@show GL.proportional(terms[i],terms[j])
+
+				end 
+
+	
+				#	error()
+	
+	
+				#	pr("s1",s1) 
+	
+				pr("s3",s3) 
+	
+	
+	
+	
+		
+			pr("S",S)
+			pr.("S Term ".*string.(1:length(S)),S.Terms)
+			
+			pr("S3",S3)
+			pr.("S3 Term ".*string.(1:length(S3)),S3.Terms)
+
+	
+			if length(S)==length(S3)
+
+				for i=1:length(S)
+
+					@show S.Terms[i]==S.Terms[i]
+					@show S.Terms[i]==S3.Terms[i]
+
+				end 
+
+				@show GL.same_fields(S,S3)
+	
+				@show Set(vcat(GL.field_name(S)))
+				@show Set(vcat(GL.field_name(S3)))
+				
+
+				@show S==S3 
+
+
+
+			end 
+
+
+
+		
+
+		
+
+			#	@show s1==s2 
+			#	@show S.Weight
+#			#	@show s1*S.Weight 
+
+
+				error()
+
+
+			end 
+
+			S4 = S+S 
+
+			S5 = 2S 
+
+
+			if S4 != S5 
+
+			pr("S4",S4)
+			pr.("S4 Term ".*string.(1:length(S4)),S4.Terms)
+			
+			pr("S5",S5)
+			pr.("S5 Term ".*string.(1:length(S5)),S5.Terms)
+
+
+			error()
+
+
+
+			end 
+
+
+
+
+			@test S+S == 2S  
 	
 #
 #		J1,Q1 = GL.derivatives(P1) 

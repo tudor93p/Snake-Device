@@ -3,7 +3,7 @@ module GL#GinzburgLandau
 
 import LinearAlgebra, Combinatorics, QuadGK 
 
-import myLibs: Utils 
+import myLibs: Utils, Algebra
 
 using OrderedCollections: OrderedDict 
 
@@ -16,10 +16,9 @@ using Constants: MAIN_DIM
 import ..Lattice, ..Hamiltonian 
 
 
-small_weight(w::Real)::Bool = abs(w)<1e-10
+small_weight(w::Number)::Bool = abs(w)<1e-10
 
-
-same_weight(w1::Real, w2::Real)::Bool = small_weight(w1-w2)  
+same_weight(w1::Number, w2::Number)::Bool = small_weight(w1-w2)  
 
 
 
@@ -74,9 +73,93 @@ nr_fields(I::AbstractMatrix{Int})::Int = size(I,2)
 
 each_fieldfactor(I::AbstractMatrix{Int})::Base.Generator = eachcol(I)
 
+function outer_equals(I1::AbstractMatrix{Int}, I2::AbstractMatrix{Int}
+										 )::Matrix{Bool}
+
+	dropdims(all(Algebra.OuterBinary(I1, I2, ==, dim=2),dims=1),dims=1)
+
+end  
+
+
+function has_disjoint_pairs!(E::AbstractMatrix{Bool})::Bool
+
+	size(E,1)==size(E,2) || return false 
+
+	for j in axes(E,2)
+
+		i = findfirst(view(E, :, j))
+
+		if isnothing(i) # if no pair is found for "j" 
+			
+			return false 
+
+		else # if a pair "i" was found, make "i" henceforth unavailable
+
+			E[i,:] .= false 
+
+		end 
+
+	end 
+
+	return true 
+
+end 
+
+
+function has_disjoint_pairs(f::Function, 
+														iter1::Utils.List,#AbstractVector,
+														iter2::Utils.List,#AbstractVector,
+														data...
+														)::Bool
+
+	length(iter1)==length(iter2) || return false 
+
+
+	recognized = falses(length(iter2)+1) 
 
 
 
+
+	for (i,t1) in enumerate(iter1)
+
+		recognized[end] = false 
+
+		for (j,t2) in enumerate(iter2)
+
+			if !recognized[j] && f(t1, t2, data...)
+
+				recognized[j] = true  
+
+				recognized[end] = true
+
+				break  
+
+			end 
+
+		end 
+
+		recognized[end] || return false 
+
+	end 
+
+	return true 
+
+end 
+
+
+function proportional(i1::AbstractVector{Int}, i2::AbstractVector{Int})::Bool
+
+	i1==i2 
+
+end  
+
+
+function same_inds(I1::AbstractMatrix{Int}, I2::AbstractMatrix{Int}
+									 )::Bool
+
+	size(I1)==size(I2) && has_disjoint_pairs!(outer_equals(I1, I2))
+
+end 
 
 function disregard_fieldfactors(I::AbstractMatrix{Int}, 
 																i::Union{Int,AbstractVector{Int}},
@@ -155,9 +238,22 @@ struct GL_MixedProduct
 
 	Factors::Vector{GL_Product} 
  
+end   
 
+
+function GL_MixedProduct_(fn::Vector{String},
+												 w::Float64,
+												 ps::Vector{GL_Product}
+												 )::GL_MixedProduct 
+
+	@assert allunique(fn) "The args cannot be used multiple times"
+
+	return GL_MixedProduct(w, fn, ps)
 
 end  
+
+
+
 
 struct GL_Scalar 
 
@@ -169,10 +265,39 @@ struct GL_Scalar
 
 	Terms::Vector{GL_MixedProduct}
 
+
+	function GL_Scalar(FieldNames::AbstractVector{<:AbstractString},
+											FieldDistrib::AbstractVector{<:AbstractVector{Int}},
+											Weight::Float64,
+											Terms::AbstractVector{GL_MixedProduct}
+										 ) 
+
+		categories = cumulate_categories(Terms) 
+		
+		u_inds = unique_cumul_categ(categories)
+
+		if isempty(u_inds) || small_weight(Weight)
+
+			P = [zero(Terms[argmin(length.(Terms))])]
+
+			return new(FieldNames, fieldargs_distrib(FieldNames, P), 0.0, P)
+
+		elseif categories==1:length(Terms) 
+
+			return new(FieldNames, FieldDistrib, Weight, Terms)
+
+		else 
+
+			return new(FieldNames, 
+								 [FieldDistrib[i[1]] for i in u_inds],
+								 Weight, 
+								 cumulate_(Terms, u_inds))
+		end 
+
+	end 
+
+
 end 
-
-
-
 #===========================================================================#
 #
 #
@@ -198,24 +323,52 @@ field_name(P::GL_Scalar, i::Int)::Vector{String} = field_name(P.Terms[i])
 field_name(P::GL_Scalar)::Vector{String} = P.FieldNames 
 
 
+function fieldargs_distrib(unique_names::AbstractVector{<:AbstractString},
+													 item::AbstractString,
+													 )::Vector{Int} 
+
+	fieldargs_distrib(unique_names, [item])
+
+end 
+
+function fieldargs_distrib(unique_names::AbstractVector{<:AbstractString},
+													 item::AbstractVector{<:AbstractString},
+													 )::Vector{Int} 
+	
+	i = indexin(item, unique_names)
+
+	@assert all(!isnothing, i) "Some fields not found"
+
+	return Vector{Int}(i) 
+
+end  
 
 
 
 function fieldargs_distrib(unique_names::AbstractVector{<:AbstractString},
-													 v::AbstractVector{T}
-													 )::Vector{Vector{Int}} where T<:Union{GL_Product,GL_MixedProduct}
+													 v::AbstractVector{<:AbstractVector{<:AbstractString}},
+													 )::Vector{Vector{Int}} 
 	
-	map(v) do item 
-		
-		i = indexin(vcat(field_name(item)), unique_names)
+	[fieldargs_distrib(unique_names, item) for item in v]
 
-		@assert all(!isnothing, i) "Some fields not found"
+end  
 
-		return Vector{Int}(i) 
+function fieldargs_distrib(unique_names::AbstractVector{<:AbstractString},
+													 p::Union{GL_Product,GL_MixedProduct},
+													 )::Vector{Int}
 
-	end 
+	fieldargs_distrib(unique_names, field_name(p))
 
 end 
+
+function fieldargs_distrib(unique_names::AbstractVector{<:AbstractString},
+													 v::AbstractVector{<:Union{GL_Product,GL_MixedProduct}},
+													 )::Vector{Vector{Int}}  
+
+	[fieldargs_distrib(unique_names, item) for item in v]
+
+end  
+
 #===========================================================================#
 #
 #
@@ -326,16 +479,6 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function GL_MixedProduct_(fn::Vector{String},
-												 w::Float64,
-												 ps::Vector{GL_Product}
-												 )::GL_MixedProduct 
-
-	@assert allunique(fn) "The args cannot be used multiple times"
-
-	return GL_MixedProduct(w, fn, ps)
-
-end  
 
  
 
@@ -348,6 +491,8 @@ function GL_MixedProduct(fns::AbstractVector{<:Union{Char,AbstractString,Symbol}
 
 
 	unique_field_names = unique(field_name.(fns)) 
+
+	small_weight(w)
 
 	I = only.(fieldargs_distrib(unique_field_names, ps)) 
 
@@ -447,38 +592,32 @@ end
 
 
 
-function same_products(P::GL_MixedProduct, Q::GL_MixedProduct)::Bool
 
-	same_fields(P,Q) || return false 
 
-	for p in P.Factors 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
-		I = findall(same_fields(p), Q.Factors) 
+
+
+
+
+
+
+
+function equal_prods(t1::T, t2::T, W1::Float64, W2::Float64,
+										 )::Bool where T<:Union{GL_Product,GL_MixedProduct}
+
+	proportional(t1,t2) && same_weight(weight(t1)*W1, weight(t2)*W2)
+
+end  
+
+
+function equal_prods(S1::GL_Scalar, S2::GL_Scalar)::Bool
 	
-		@assert length(I)==1 
-
-		same_products(p, Q.Factors[only(I)]) || return false 
-
-	end 
-
-	return true
-
-end 
-
-
-function same_products(S1::GL_Scalar, S2::GL_Scalar)::Bool 
-
-	same_fields(S1,S2) || return false 
-
-	for t1 in S1.Terms 
-
-		I = findall(same_products(t1), S2.Terms) 
-
-		@assert length(I)==1  
-
-	end 
-
-	return true 
+	has_disjoint_pairs(equal_prods, parts(S1), parts(S2), S1.Weight, S2.Weight)
 
 end 
 
@@ -486,47 +625,16 @@ end
 
 
 function ==(P::T, Q::T)::Bool where T<:Union{GL_Product,GL_MixedProduct}
-	
-	same_weight(P,Q) && same_products(P,Q) 
+
+	proportional(P, Q) && same_weight(P, Q)
 
 end 
 
 
-function ==(S1::GL_Scalar, S2::GL_Scalar)::Bool 
 
-	#assuming unique terms A
-	length(S1.Terms)==length(S2.Terms) || return false 
+function ==(S1::GL_Scalar, S2::GL_Scalar)::Bool # assuming unique terms 
 
-	same_fields(S1,S2) || return false 
-
-	recognized = falses(length(S2.Terms))
-
-#	current = falses(length(S1.Terms))
-
-	for t1 in S1.Terms 
-
-		w1 = weight(t1)*S1.Weight 
-
-		I = findall([rec ? false : same_products(t1,t2) for (rec,t2) in zip(recognized,S2.Terms)])
-
-		# not yet recognized; these terms I are proportional to t1 
-
-		for i in I 
-
-			same_weight(w1, weight(S2.Terms[i])*S2.Weight) || continue 
-
-			recognized[i] = true  # if same weight, i was recognized
-
-			break 
-
-		end 
-
-		any(view(recognized, I)) || return false 
-
-	end 
-
-
-	return all(recognized)
+	same_fields(S1,S2) && equal_prods(S1, S2)  
 
 end 
 
@@ -560,27 +668,20 @@ function GL_Scalar(w::Real,
 		end 
 
 
-	end 
-
+	end  
 
 	return GL_Scalar(unns, field_distrib, w, terms)
-
-#	FieldNames::Vector{String}
-#
-#FieldDistrib::Vector{Vector{Int}} 
-#
-#	Weight::Float64 
-#
-#	Terms::Vector{GL_MixedProduct}
 
 end 
 
 
 
 function GL_Scalar(w::Real,
-									 terms::AbstractVector{GL_MixedProduct})::GL_Scalar  
+									 terms::AbstractVector{GL_MixedProduct})::GL_Scalar   
 
-	GL_Scalar(w, unique(mapreduce(field_name, vcat, terms)), terms)
+	@assert !isempty(terms) #&& return zero(terms)
+
+	return GL_Scalar(w, union((field_name(t) for t in terms)...), terms)
 
 end 
 
@@ -627,7 +728,13 @@ function (p::GL_Product)(field::AbstractArray{T,N}
 
 end 
 
-Base.length(P::GL_MixedProduct)::Int = length(P.Factors)
+parts(p::GL_Product)::Base.Generator = each_fieldfactor(p)
+
+parts(P::GL_MixedProduct)::AbstractVector{GL_Product} = P.Factors 
+
+parts(S::GL_Scalar)::AbstractVector{GL_MixedProduct} = S.Terms 
+
+Base.length(a::Union{GL_Product,GL_MixedProduct,GL_Scalar})::Int = length(parts(a))
 
 
 
@@ -650,7 +757,6 @@ function (P::GL_MixedProduct)(fields::Vararg{<:AbstractArray,N}
 
 end 
 
-Base.length(S::GL_Scalar)::Int = length(S.Terms)
 
 function (S::GL_Scalar)(fields::Vararg{<:AbstractArray, N})::Number where N 
 
@@ -817,7 +923,9 @@ end
 
 function Base.:*(w::Real,p::T)::T where T<:Union{GL_Product,GL_MixedProduct,GL_Scalar}
 
-	T(map(propertynames(p)) do k
+	same_weight(1,w) && return p
+
+	return T(map(propertynames(p)) do k
 
 		prop = getproperty(p,k)
 
@@ -827,7 +935,9 @@ function Base.:*(w::Real,p::T)::T where T<:Union{GL_Product,GL_MixedProduct,GL_S
 
 end 
 
-function Base.:*(p::T,w::Real)::T where T<:Union{GL_Product,GL_MixedProduct,GL_Scalar}
+function Base.:*(p::T,w::Real)::T where T<:Union{GL_Product,
+																								 GL_MixedProduct,
+																								 GL_Scalar}
 	w*p 
 
 end 
@@ -842,22 +952,68 @@ end
 
 
 
-function Base.sum(ps::AbstractVector{GL_MixedProduct})::GL_Scalar
+Base.sum(ps::AbstractVector{GL_MixedProduct})::GL_Scalar = GL_Scalar(ps)
 
-	GL_Scalar(cumulate(ps))
-
-end
-
-function Base.:+(ps::Vararg{GL_MixedProduct})::GL_Scalar
-
-	sum([p for p in ps])
-
-end 
+Base.:+(ps::Vararg{GL_MixedProduct})::GL_Scalar = sum([p for p in ps])
 
 
-function Base.:+(ps::Vararg{GL_Scalar})::GL_Scalar
+function Base.:+(
+								 S1::GL_Scalar, S2::GL_Scalar)::GL_Scalar
 
-	error() 
+
+	W1 = [S1.Weight*weight(t1) for t1 in S1.Terms]
+
+	nz1 = findall(!small_weight, W1)
+
+	isempty(nz1) && return S2 
+
+
+	W2 = [S2.Weight*weight(t2) for t2 in S2.Terms]
+
+	nz2 = findall(!small_weight, W2)
+
+	isempty(nz2) && return S1
+
+	
+	new_FieldNames = union(field_name(S1), field_name(S2))
+
+
+
+	for i1 in nz1 
+
+		for i2 in nz2 
+
+			if !small_weight(W2[i2]) && proportional(S1.Terms[i1], S2.Terms[i2])
+
+				W1[i1] += W2[i2]
+
+				W2[i2] = 0   
+
+				break 
+
+			end
+
+		end  
+
+	end 
+
+
+	nz1 = findall(!small_weight, W1)
+	nz2 = findall(!small_weight, W2)
+
+	new_FD = vcat(view(S1.FieldDistrib, nz1),
+			 [fieldargs_distrib(new_FieldNames, field_name(S2.Terms[i2])) for i2 in nz2]
+			 )
+
+
+
+	new_Terms = vcat(
+									 [t*(w/weight(t)) for (w,t) in zip(view(W1,nz1),view(S1.Terms,nz1))],
+									 [t*(w/weight(t)) for (w,t) in zip(view(W2,nz2),view(S2.Terms,nz2))],
+									 )
+
+
+	return GL_Scalar(new_FieldNames, new_FD, 1.0, new_Terms)
 
 end 
 
@@ -945,29 +1101,74 @@ function Base.findall(i::AbstractVector{Int},
 end  
 
 
-function same_products(p::Union{GL_Product,GL_Tensor},
-									 q::Union{GL_Product,GL_Tensor}
-									 )::Bool 
-
-	size(p.Inds)==size(q.Inds) || return false 
-
-	for i in each_fieldfactor(p)
-
-		isnothing(findfirst(i, q)) && return false 
-
-	end 
-
-	return true 
-
-end  
 
 
 
-function same_products(p::T)::Function where T<:Union{GL_Product,GL_MixedProduct}
+
+function outer_equals(p::GL_Product, q::GL_Product)::Matrix{Bool}
+
+	outer_equals(p.Inds, q.Inds)
+
+end 
+
+function same_inds(p::GL_Product, q::GL_Product)::Bool 
+
+	same_inds(p.Inds, q.Inds)
+
+end 
+
+#function one_to_one(E::AbstractMatrix{Bool})::Bool 
+#
+#	for i=1:LinearAlgebra.checksquare(E), d=1:2
+#
+#		count(selectdim(E, d, i))==1 || return false 
+#
+#	end  
+#
+#	return true 
+#
+#end  
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+#function proportional(p::GL_Product, q::GL_Product)::Bool 
+#
+#	same_fields(p,q) && same_inds(p,q)
+#
+#end  
+
+
+function proportional(P::T, Q::T
+											 )::Bool where T<:Union{GL_Product, 
+																							GL_MixedProduct, 
+																							GL_Scalar}
+
+	same_fields(P,Q) && has_disjoint_pairs(proportional, parts(P), parts(Q))
+
+end 
+
+
+function proportional(p::T)::Function where T<:Union{GL_Product,GL_MixedProduct,GL_Scalar}
 	
-	same_product_(q::T)::Bool = same_products(p,q)
+	prop(q::T)::Bool = proportional(p,q)
 
 end  
+
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 function Base.zero(p::GL_Product)::GL_Product 
@@ -976,6 +1177,13 @@ function Base.zero(p::GL_Product)::GL_Product
 
 end 
 
+function Base.zero(p::T)::T where T<:Union{GL_MixedProduct,GL_Scalar}
+
+#	T(p.FieldNames, 0.0, [zero(first(parts(p)))])
+
+	T(0.0, [zero(first(parts(p)))])
+	
+end 
 
 
 
@@ -1145,17 +1353,15 @@ end
 
 
 
-field_rank(c::GL_MixedProduct)::Vector{Int} = map(field_rank, c.Factors)
-
-nr_fields(c::GL_MixedProduct)::Vector{Int} = map(nr_fields, c.Factors)
- 
+field_rank(c::GL_MixedProduct)::Vector{Int} = map(field_rank, parts(c))
+nr_fields(c::GL_MixedProduct)::Vector{Int} = map(nr_fields, parts(c))
 
 
 
-nr_fields(c::GL_MixedProduct, field::Int)::Int = nr_fields(c.Factors[field])
+nr_fields(c::GL_MixedProduct, field::Int)::Int = nr_fields(parts(c)[field])
+field_rank(c::GL_MixedProduct, field::Int)::Int = field_rank(parts(c)[field])
 
-field_rank(c::GL_MixedProduct, field::Int)::Int = field_rank(c.Factors[field])
-
+enum_parts = enumerate∘parts 
 
 enumerate_fieldfactors = enumerate∘each_fieldfactor 
 
@@ -1254,8 +1460,6 @@ function derivatives(P::GL_MixedProduct, y::Int
 #
 end 
 
-
-
 #===========================================================================#
 #
 #
@@ -1266,11 +1470,16 @@ function cumulate(ps::AbstractVector{T},
 									start::Int=1
 									)::AbstractVector{T} where T<:Union{GL_Product,GL_MixedProduct}
 
+	pr = false#T<:GL_MixedProduct && length(ps)==2
+
+	pr && @show start 
+
+
 	for i=start:length(ps)
 
 		js = i+1:length(ps) 
 
-		sim_i = i .+ findall(same_products(ps[i]), view(ps, js)) 
+		sim_i = i .+ findall(proportional(ps[i]), view(ps, js)) 
 
 		js_ = setdiff(js, sim_i) 
 
@@ -1279,6 +1488,9 @@ function cumulate(ps::AbstractVector{T},
 
 		W = sum(weight, view(ps, sim_i); init=wi)
 
+		pr && @show i js sim_i wi W 
+
+		
 		if small_weight(wi) 
 			
 			return cumulate(view(ps, vcat(1:i-1, small_weight(W) ? js_ : js)), i)
@@ -1294,6 +1506,132 @@ function cumulate(ps::AbstractVector{T},
 	return ps#[p for p in ps if abs(p.Weight)>1e-10]
 
 end 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function cumulate_categories(ps::AbstractVector{<:Union{GL_Product,GL_MixedProduct}}
+														)::Vector{Int}
+
+
+
+	rels::AbstractVector{Int}=zeros(Int,length(ps)) # output 
+
+
+	W = weight.(ps) 
+
+	seen = small_weight.(W)  # the insignificant components are not considered 
+
+
+	for (i,p) in enumerate(ps)
+
+		seen[i] && continue # skip if "i" already looked at 
+
+		seen[i] = true  		# "i" is being looked at now
+
+		@assert rels[i]==0  # rels[i] changes only when seen. Error otherwise 
+
+
+		rels[i] = i					# has significant weight => its own category 
+
+
+		sim_i = [j for j in i+1:length(ps) if !seen[j]&&proportional(p,ps[j])] 
+
+		isempty(sim_i) && continue 
+
+		
+
+		@assert all(isequal(0), view(rels, sim_i)) # since it hasn't been seen 
+
+		seen[sim_i] .= true  
+
+
+
+		if small_weight(W[i]+sum(view(W, sim_i)))
+						# weight "i" significant, but the total amounts to zero 
+					
+			rels[i] = 0 
+
+		else 
+
+			rels[sim_i] .= i 
+
+		end  # rels[...] remain zero if the total weight is small
+
+
+	end  
+
+
+	return rels 
+
+end  
+
+
+function unique_cumul_categ(categories::AbstractVector{Int}
+														)::Vector{Vector{Int}}
+
+	u_categ,u_inds = Utils.Unique(categories,inds=:all)
+
+	I = u_categ.>0 
+
+	for (c, (i,)) in zip(view(u_categ,I), view(u_inds,I))
+
+		@assert c==i
+
+	end  
+
+	return view(u_inds, I) 
+
+end 
+
+
+
+function cumulate_(ps::AbstractVector{T},
+									 u_inds::AbstractVector{<:AbstractVector{Int}}
+									)::AbstractVector{T} where T<:Union{GL_Product,GL_MixedProduct}
+
+	map(u_inds) do degen_inds
+
+		p = ps[first(degen_inds)]
+
+		length(degen_inds)==1 && return p
+
+		w = weight(p)
+
+		w \= @views sum(weight, ps[degen_inds[2:end]]; init=w)
+
+		return p * w
+
+	end 
+
+end 
+
+
+
+function cumulate_(ps::AbstractVector{T},
+									)::AbstractVector{T} where T<:Union{GL_Product,GL_MixedProduct}
+
+	categories = cumulate_categories(ps)
+
+	categories==1:length(ps) && return ps 
+
+	return cumulate_(ps, unique_cumul_categ(categories))
+					 
+end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
 
 # high-rank tensors will have few non-vanishing index combinations 
 # stored as in GL_Product 
