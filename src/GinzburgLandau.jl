@@ -69,6 +69,89 @@ D4h_grad_ord2 = [
 
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+struct FieldPlaceholder{Rank}
+
+	Name::String 
+
+end 
+
+struct Index{Rank}
+
+	I::NTuple{Rank,Int}
+
+end 
+
+struct GL_Product{Rank}
+
+	Arg::FieldPlaceholder{Rank}
+
+	Weight::Union{Float64,ComplexF64}
+
+	Inds::Vector{Index{Rank}}
+
+end 
+
+
+struct GL_MixedProduct{NrArgs}
+
+	Weight::Union{Float64,ComplexF64}
+
+	Factors::NTuple{NrArgs,GL_Product}
+
+	function GL_MixedProduct{N}(w::Union{Float64,ComplexF64},
+													ps::NTuple{M,GL_Product}
+													)::GL_MixedProduct{N} where {N,M}
+
+		@assert N==M && allunique(fieldargs.(ps))
+
+		return new{N}(w, ps)
+
+	end 
+ 
+end   
+
+
+
+
+struct GL_Scalar{NrArgs,NrTerms}
+
+	Args::NTuple{NrArgs,FieldPlaceholder}
+
+	FieldDistrib::NTuple{NrTerms,Vector{Int}} 
+
+	Weight::Union{Float64,ComplexF64} 
+
+	Terms::NTuple{NrTerms,GL_MixedProduct}
+
+end 
+
+
+struct GL_Tensor{D}
+	
+	Weight::Union{Float64,ComplexF64}
+	
+	Dimensions::NTuple{D,Int}
+
+	Inds::Vector{NTuple{D,Index}}
+
+	Components::Vector{GL_Scalar}
+
+end 
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
 
 
 
@@ -80,18 +163,38 @@ D4h_grad_ord2 = [
 #
 #nr_fields(I::AbstractMatrix{Int})::Int = size(I,2)
 
-function field_rank(I::AbstractVector{NTuple{N,Int}})::Int where N
-	
-	N
-	
+
+function field_rank(I::NTuple{N,Int})::Int where N
+
+	N 
+
 end 
 
-nr_fields(I::AbstractVector{<:Tuple})::Int = length(I)
+function field_rank(I::Index{R})::Int where R
+
+	R
+
+end 
+function field_rank(I::AbstractVector{<:Union{Index,Tuple{Vararg{Int}}}})::Int 
+
+	r = field_rank(I[1])
+
+	for i in 2:length(I)
+
+		@assert r == field_rank(I[i])
+
+	end 
+
+	return r 
+
+end 
+
+nr_fields(I::AbstractVector{<:Index})::Int = length(I)
 
 
 
 #each_fieldfactor(I::AbstractMatrix{Int})::Base.Generator = eachcol(I)
-function each_fieldfactor(I::T)::T where T<:AbstractVector{<:Tuple}
+function each_fieldfactor(I::T)::T where T<:AbstractVector{<:Index}
 
 	I
 
@@ -173,17 +276,31 @@ function has_disjoint_pairs(f::Function,
 end 
 
 
-function proportional(i1::T, i2::T)::Bool where T<:Tuple{Vararg{Int}}
+#function ==(i1::Index, i2::Tuple{Vararg{int}})::Bool 
+#
+#	i1==Index(i2)
+#
+#end 
 
-	i1==i2 
+
+
+
+function ==(i1::Index, i2::Index)::Bool# where T<:Tuple{Vararg{Int}}
+
+	field_rank(i1)==field_rank(i2) && i1.I==i2.I
 
 end  
 
 
-#function same_inds(I1::AbstractMatrix{Int}, I2::AbstractMatrix{Int}
+
+proportional(i1::Index, i2::Index)::Bool = i1==i2 
+
+
+#function same_inds(I1::AbstractVector{Index}, 
+#									 I2::AbstractVector{Index},
 #									 )::Bool
 #
-#	size(I1)==size(I2) && has_disjoint_pairs!(outer_equals(I1, I2))
+#	has_disjoint_pairs(==, I1, I2)
 #
 #end 
 
@@ -195,9 +312,9 @@ end
 #
 #end 
 
-function disregard_fieldfactors(I::AbstractVector{T},
+function disregard_fieldfactors(I::AbstractVector{<:Index},
 																i::Union{Int,AbstractVector{Int}},
-																)::AbstractVector{T} where T<:Tuple{Vararg{Int}}
+																)::AbstractVector{<:Index}
 
 	select_fieldfactors(I, setdiff(1:length(I), i))
 
@@ -220,17 +337,17 @@ end
 #
 #end 
 
-function select_fieldfactor(I::AbstractVector{T},
+function select_fieldfactor(I::AbstractVector{<:Index},
 														 i::Int,
-														 )::T where T<:Tuple{Vararg{Int}}
+											 )::Index #T where T<:Tuple{Vararg{Int}}
 
 	I[i]
 
 end 
 
-function select_fieldfactors(I::AbstractVector{T},#NTuple{N,Int}},
+function select_fieldfactors(I::AbstractVector{<:Index},#NTuple{N,Int}},
 														 i::Union{Int,AbstractVector{Int}},
-														 )::AbstractVector{T} where T<:Tuple{Vararg{Int}}
+														 )::AbstractVector{<:Index}# where T<:Tuple{Vararg{Int}}
 
 	view(I, vcat(i))
 
@@ -248,9 +365,9 @@ end
 
 
 
-function split_fieldfactor(I::AbstractVector{T},
+function split_fieldfactor(I::AbstractVector{<:Index},
 														i::Int#,AbstractVector{Int}},
-														)::Tuple{T,AbstractVector{T}} where T<:Tuple{Vararg{Int}}
+														)::Tuple{Index,AbstractVector{<:Index}}# where T<:Tuple{Vararg{Int}}
 
 	(select_fieldfactor(I,i), disregard_fieldfactors(I,i))
 
@@ -266,7 +383,7 @@ end
 
 
 function parse_inds(inds...#::Vararg{T,N} where T
-										)::Vector#{Tuple} #where N#Matrix{Int} where N
+										)::Vector{<:Index}#Tuple} #where N#Matrix{Int} where N
 
 	rank = map(inds) do i
 		
@@ -280,7 +397,7 @@ function parse_inds(inds...#::Vararg{T,N} where T
 
 	R = rank[1] 
 
-	return [NTuple{R,Int}(getindex(i,r) for r=1:R) for i in inds] 
+	return [Index{R}(Tuple(getindex(i,r) for r=1:R)) for i in inds] 
 
 end  
 
@@ -299,31 +416,9 @@ end
 #
 #---------------------------------------------------------------------------#
 
-struct FieldPlaceholder{Rank}
-
-	Name::String 
-
-end 
-
-
-struct GL_Product{Rank}
-
-	Arg::FieldPlaceholder{Rank}
-
-	Weight::Union{Float64,ComplexF64}
-
-	Inds::Vector{NTuple{Rank,Int}}
-
-end 
-
-
-struct GL_MixedProduct{NrArgs}
-
-	Weight::Union{Float64,ComplexF64}
-
-	Factors::NTuple{NrArgs,GL_Product}
- 
-end   
+Index(I::Index)::Index = I 
+Index(i::Int)::Index{1} = Index(tuple(i))
+Index(v::AbstractVector{Int})::Index = Index(Tuple(v))
 
 
 
@@ -339,18 +434,6 @@ end
 
 
 
-
-struct GL_Scalar{NrArgs,NrTerms}
-
-	Args::NTuple{NrArgs,FieldPlaceholder}
-
-	FieldDistrib::NTuple{NrTerms,Vector{Int}} 
-
-	Weight::Union{Float64,ComplexF64} 
-
-	Terms::NTuple{NrTerms,GL_MixedProduct}
-
-end 
 
 function GL_Scalar_(args::NTuple{Na,FieldPlaceholder},
 
@@ -369,9 +452,7 @@ function GL_Scalar_(args::NTuple{Na,FieldPlaceholder},
 
 	if isempty(u_inds) || small_weight(w)
 
-		P = [zero(terms[argmin(length.(terms))])]
-
-		return GL_Scalar{Na,1}(args, fieldargs_distrib(args, P), 0.0, P)
+		return zero_scalar(args, fd, terms)
 
 	elseif categories==1:length(terms) 
 
@@ -416,6 +497,15 @@ function fieldargs(S::GL_Scalar{Na})::NTuple{Na,FieldPlaceholder} where Na
 	
 end 
 
+function fieldargs(S::GL_Scalar{Na}, i::Int)::FieldPlaceholder where Na
+
+	@assert 1<=i<=Na 
+
+	return fieldargs(S)[i]
+
+end 
+
+
 
 argnames(s::AbstractString)::String = s 
 
@@ -423,9 +513,9 @@ argnames(c::Char)::String = string(c)
 
 argnames(rank::Int)::String = string('A'+rank-1) 
 
-function argnames(M::AbstractVector{NTuple{N,Int}})::String where N 
-	
-	argnames(N) 
+function argnames(M::AbstractVector{<:Index})::String# where N 
+
+	argnames(field_rank(M))
 
 end 
 
@@ -545,7 +635,7 @@ function fieldargs_distrib(S::GL_Scalar{Na,Nt}, I::AbstractVector{Int}
 
 	end 
 
-	return fieldargs_distrib(S)[i]
+	return fieldargs_distrib(S)[I]
 
 end 
 
@@ -565,36 +655,42 @@ end
 
 function GL_Product(f::FieldPlaceholder{N},
 										w::Union{Float64,ComplexF64},
-										M::AbstractVector{NTuple{N,Int}},
+										M::AbstractVector{<:Union{Tuple,<:Index}},#NTuple{N,Int}},
 										)::GL_Product where N
 
-	GL_Product{N}(f, w, collect(M))
+	Inds = Vector{Index{N}}(undef,length(M))
+
+	for (i,m) in enumerate(M)
+
+		Inds[i] = Index(m)
+
+	end 
+
+	return GL_Product{N}(f, w, Inds)
 
 end 
 
 function GL_Product(name::Union{AbstractString,Symbol,Char},
 										w::Union{Float64,ComplexF64},
-										M::AbstractVector{NTuple{N,Int}},
-										)::GL_Product where N
+										M::AbstractVector{<:Union{Tuple,<:Index}},#NTuple{N,Int}},
+										)::GL_Product #where N
 
-	GL_Product(FieldPlaceholder{N}(argnames(name)), w, M)
+	GL_Product(FieldPlaceholder{field_rank(M)}(argnames(name)), w, M)
 
 end 
 
 
 function GL_Product(w::Union{Float64,ComplexF64},
-										M::AbstractVector{NTuple{N,Int}},
-										)::GL_Product where N
+										M::AbstractVector{<:Union{Tuple,<:Index}},#NTuple{N,Int}},
+										)::GL_Product #where N
 
-	GL_Product(argnames(N), w, M)
+	GL_Product(argnames(M), w, M)
 
 end 
 
 
 function GL_Product(name::Union{Char,AbstractString,Symbol},
-#										M::AbstractMatrix{Int}
-										M::AbstractVector{<:Tuple},#NTuple{N,Int}}
-										#M::AbstractMatrix{Int}
+										M::AbstractVector{<:Union{Tuple,<:Index}}
 										)::GL_Product 
 
 	GL_Product(argnames(name), 1.0, M)
@@ -602,11 +698,8 @@ function GL_Product(name::Union{Char,AbstractString,Symbol},
 end 
 
 
-function GL_Product(
-										M::AbstractVector{<:Tuple},#NTuple{N,Int}}
-										#M::AbstractMatrix{Int}
-#										M::AbstractMatrix{Int}
-									 )::GL_Product 
+function GL_Product(M::AbstractVector{<:Union{Tuple,<:Index}}
+								)::GL_Product 
 
 	GL_Product(1.0, M)
 
@@ -688,7 +781,7 @@ function parse_inds_2(w::T, inds_or_prods...
 
 end 
 
-function parse_inds_2(arg1::Union{GL_Product, Int, 
+function parse_inds_2(arg1::Union{GL_Product, Int, Index,
 																	Tuple{Vararg{Int}}, AbstractVector{Int}},
 											args...
 										 )::Tuple{Float64,Vector{GL_Product}}
@@ -716,8 +809,6 @@ function GL_MixedProduct(fns::AbstractVector{<:Union{Char,AbstractString,Symbol}
 												 )::GL_MixedProduct
 
 	unique_field_names = unique(argnames.(fns)) 
-
-
 
 	I = only.(fieldargs_distrib(unique_field_names, ps)) 
 
@@ -761,6 +852,12 @@ function GL_MixedProduct(arg1::Union{Float64, ComplexF64, GL_Product},
 
 end 
 
+function GL_MixedProduct(args::Tuple{Vararg{GL_Product}})::GL_MixedProduct
+
+	GL_MixedProduct(parse_inds_2(args...)...)
+
+end 
+
 function GL_MixedProduct(fns::Tuple,
 												 arg1::Union{Float64,ComplexF64,GL_Product},
 												 args...)::GL_MixedProduct
@@ -773,7 +870,7 @@ end
 function GL_MixedProduct(fns::AbstractVector{<:Union{Char,AbstractString,Symbol}},
 												 arg1::T1,
 												 arg2::T2,
-												 args...)::GL_MixedProduct where {T<:Union{Float64,ComplexF64, GL_Product, Int, Tuple{Vararg{Int}}, AbstractVector{Int}},T1<:T,T2<:T}
+												 args...)::GL_MixedProduct where {T<:Union{Float64,ComplexF64, GL_Product, Int, Tuple{Vararg{Int}}, Index, AbstractVector{Int}},T1<:T,T2<:T}
 
 	GL_MixedProduct(fns, parse_inds_2(arg1, arg2, args...)...)
 	
@@ -912,9 +1009,16 @@ end
 
 
 
-function ==(P::T, Q::T)::Bool where T<:Union{GL_Product,GL_MixedProduct}
+function ==(P::T1, Q::T2
+					 )::Bool where {T<:Union{GL_Product,GL_MixedProduct},T1<:T,T2<:T}
 
-	proportional(P, Q) && same_weight(P, Q)
+	if same_fields(P,Q) && same_weight(P,Q)
+		
+		return small_weight(P) ? true : proportional(P, Q) 
+		
+	end 
+	
+	return false 
 
 end 
 
@@ -1005,7 +1109,7 @@ end
 #---------------------------------------------------------------------------#
 
 
-function parts(p::GL_Product{R})::AbstractVector{NTuple{R,Int}} where R
+function parts(p::GL_Product{R})::AbstractVector{Index{R}} where R
 
 	each_fieldfactor(p)
 
@@ -1040,9 +1144,30 @@ function parts(S::GL_Scalar{Na,Nt}, i::Int)::GL_MixedProduct where {Na,Nt}
 
 end 
 
+function parts(T::GL_Tensor)::Vector{GL_Scalar}
+
+	T.Components
+
+end 
+
+function parts(T::GL_Tensor, i::Int)::GL_Scalar 
+
+	@assert 1<=i<=length(T.Inds) 
+
+	return T.Components[i]
+
+end 
+
+function parts(T::GL_Tensor, ::Nothing)::GL_Scalar 
+
+	zero(parts(T,1))
+
+end 
 
 
-Base.length(a::Union{GL_Product,GL_MixedProduct,GL_Scalar})::Int = length(parts(a))
+
+
+Base.length(a::Union{GL_Product,GL_MixedProduct,GL_Scalar,GL_Tensor})::Int = length(parts(a))
 
 
 
@@ -1053,11 +1178,18 @@ Base.length(a::Union{GL_Product,GL_MixedProduct,GL_Scalar})::Int = length(parts(
 #---------------------------------------------------------------------------#
 
 
+function (i::Index{R})(field::AbstractArray{T,R}
+											 )::T where {R,T<:Union{Float64,ComplexF64}}
 
-function (f::FieldPlaceholder{R})(field::AbstractArray{T,R}, 
-																	i::NTuple{R,Int},
-																	)::T where {R,T<:Union{Float64,ComplexF64}}
-	field[i...]
+	field[i.I...]
+
+end 
+
+function (f::FieldPlaceholder{R})(field::A
+																	)::A where {R,
+																						 T<:Union{Float64,ComplexF64},
+																						 A<:AbstractArray{T,R}}
+	field
 
 end 
 
@@ -1068,16 +1200,18 @@ function (p::GL_Product)(field::AbstractArray{T}
 
 	out::promote_type(typeof(p.Weight),T) = p.Weight
 
+	fieldargs(p)(field)  # check shape 
 
-	for i in each_fieldfactor(p) 
+	for I in each_fieldfactor(p) 
 
-		out *= fieldargs(p)(field,i)
+		out *= I(field)
 
 	end 
 
 	return out 
 
 end 
+
 function (P::GL_MixedProduct{N})(fields::Vararg{<:AbstractArray,N}
 																 )::Union{Float64,ComplexF64} where N 
 
@@ -1249,7 +1383,7 @@ end
 
 function Base.:*(p::GL_Product, P::GL_MixedProduct)::GL_MixedProduct
 
-	i = findfirst(==(fieldargs(p)), fieldargs(P))
+	i = findfirst(fieldargs(p), P)
 
 
 	if isnothing(i) 
@@ -1260,7 +1394,7 @@ function Base.:*(p::GL_Product, P::GL_MixedProduct)::GL_MixedProduct
 
 	else 
 
-		return replace_component(P, GL_Product_sameField(p, P.Factors[i]), i)
+		return replace_component(P, GL_Product_sameField(p, parts(P, i)), i)
 
 	end 
 
@@ -1322,23 +1456,42 @@ end
 function Base.:+(S1::GL_Scalar, S2::GL_Scalar)::GL_Scalar
 
 
-	W1 = [S1.Weight*weight(t1) for t1 in parts(S1)]
-
-	nz1 = findall(!small_weight, W1)
-
-	isempty(nz1) && return S2 
+	new_Fields = union(fieldargs(S1),fieldargs(S2))
 
 
 	W2 = [S2.Weight*weight(t2) for t2 in parts(S2)]
 
 	nz2 = findall(!small_weight, W2)
 
-	isempty(nz2) && return S1
+
+	isempty(nz2) && return GL_Scalar{length(new_Fields),length(S1)}(
+																					Tuple(new_Fields), 
+																					fieldargs_distrib(S1),
+																					S1.Weight,
+																					parts(S1)
+																					)
+									
+	new_FieldNames = argnames.(new_Fields) 
 
 
-	new_Fields = union(fieldargs(S1),fieldargs(S2))
+	W1 = [S1.Weight*weight(t1) for t1 in parts(S1)]
 
-	new_FieldNames = argnames.(new_Fields)
+	nz1 = findall(!small_weight, W1)
+
+
+	if isempty(nz1) 
+		
+		new_FD = Tuple(fieldargs_distrib(new_FieldNames,argnames(S2,i)) for i=nz2)
+
+		return GL_Scalar{length(new_Fields),length(nz2)}(
+																					Tuple(new_Fields),
+																					new_FD,
+																					S2.Weight,
+																					Tuple(parts(S2,i) for i=nz2))
+																					
+	end 
+
+
 
 
 
@@ -1375,13 +1528,11 @@ function Base.:+(S1::GL_Scalar, S2::GL_Scalar)::GL_Scalar
 												)
 
 
-
-
 	return GL_Scalar{length(new_Fields),length(nz1)+length(nz2)}(
-							Tuple(new_Fields), 
-							new_FD, 1.0, new_Terms)
+														Tuple(new_Fields), new_FD, 1.0, new_Terms)
 
 end 
+ 
 
 
 function Base.:*(S1::GL_Scalar, S2::GL_Scalar)::GL_Scalar
@@ -1409,15 +1560,6 @@ end
 
 
 
-struct GL_Tensor 
-
-	Weight::Float64
-
-	Inds::Matrix{Int} # size: tensor_rank x length(Components) 
-
-	Components::Vector{GL_Product}   
-
-end 
 #
 #function GL_Tensor(i::AbstractMatrix{Int},
 #									 t::AbstractVector{GL_Product}
@@ -1444,13 +1586,18 @@ end
 #---------------------------------------------------------------------------#
 
 
+function field_rank(f::FieldPlaceholder{R})::Int where R 
 
+	R
+
+end 
 
 function field_rank(p::GL_Product{R})::Int where R
 	
 	R
 
 end  
+
 
 nr_fields(p::GL_Product)::Int = nr_fields(p.Inds)  
 
@@ -1459,8 +1606,7 @@ nr_fields(p::GL_Product)::Int = nr_fields(p.Inds)
 
 
 
-function each_fieldfactor(p::GL_Product{R}
-												 )::AbstractVector{NTuple{R,Int}} where R
+function each_fieldfactor(p::GL_Product{R})::Vector{Index{R}} where R 
 	
 	each_fieldfactor(p.Inds)
 
@@ -1468,13 +1614,20 @@ end
 
 
 
-function Base.in(i::NTuple{N,Int}, p::GL_Product{R})::Bool where {N,R}
+function Base.in(i::Index{N}, p::GL_Product{R})::Bool where {N,R}
 
 	N==R && in(i,each_fieldfactor(p))
 
+end  
+
+function Base.in(f::FieldPlaceholder, X::Union{GL_MixedProduct,GL_Scalar}
+								)::Bool 
+
+	f in fieldargs(X)
+
 end 
 
-function Base.findfirst(i::NTuple{N,Int}, p::GL_Product{R}
+function Base.findfirst(i::Index{N}, p::GL_Product{R}
 												)::Union{Int,Nothing} where {N,R}
 
 	if N==R 
@@ -1492,17 +1645,42 @@ function Base.findfirst(i::NTuple{N,Int}, p::GL_Product{R}
 end 
 
 function Base.findall(
-											i::NTuple{N,Int}, p::GL_Product{R}
+											i::Index{N}, p::GL_Product{R}
 											)::Vector{Int} where {N,R}
 
 	N!=R ? Int[] : [i0 for (i0,I0) in enumerate_fieldfactors(p) if i==I0] 
 
 end  
 
+function Base.findall(f::FieldPlaceholder, X::Union{GL_MixedProduct,GL_Scalar}
+											)::Vector{Int}
 
+	findall(==(f), fieldargs(X))
 
+end 
 
+function Base.findfirst(f::FieldPlaceholder, 
+												X::Union{GL_MixedProduct,GL_Scalar}
+												)::Union{Nothing,Int}
 
+	findfirst(==(f), fieldargs(X))
+
+end 
+
+function Base.findfirst(fn::AbstractString,
+												X::Union{GL_MixedProduct,GL_Scalar}
+												)::Union{Nothing,Int}
+
+	findfirst(==(fn), argnames(X))
+
+end 
+
+function Base.findfirst(I::NTuple{N,Index}, T::GL_Tensor{D}
+												)::Union{Nothing,Int} where {N,D}
+
+	N==D ? findfirst(==(I), T.Inds) : nothing 
+
+end 
 
 #function outer_equals(p::GL_Product, q::GL_Product)::Matrix{Bool}
 #
@@ -1512,7 +1690,7 @@ end
 
 function same_inds(p::GL_Product, q::GL_Product)::Bool 
 
-	same_inds(p.Inds, q.Inds)
+	has_disjoint_pairs(==, parts(p), parts(q))
 
 end 
 
@@ -1576,23 +1754,39 @@ end
 
 function Base.zero(p::GL_Product{R})::GL_Product{R} where R
 
-	GL_Product{R}(fieldargs(p), 0.0, NTuple{R,Int}[])
+	GL_Product{R}(fieldargs(p), 0.0, Vector{Index{R}}(undef,0))
 
 end 
 
-function Base.zero(p::T)::T where T<:Union{GL_MixedProduct,GL_Scalar}
+function Base.zero(P::T)::T where T<:GL_MixedProduct
 
-#	T(p.FieldNames, 0.0, [zero(first(parts(p)))])
+	T(0.0, zero.(parts(P)))
 
-	T(0.0, [zero(first(parts(p)))])
-	
 end 
 
+
+function zero_scalar(args::NTuple{Na,FieldPlaceholder},
+										 fd::NTuple{Nt, AbstractVector{Int}},
+										 terms::NTuple{Nt, GL_MixedProduct}
+										 )::GL_Scalar{Na,1} where {Na,Nt}
+
+	i = argmin(length.(terms))
+
+	return GL_Scalar{Na,1}(args, fd[[i]], 0.0, tuple(zero(terms[i])))
+
+end 
+
+
+function Base.zero(S::GL_Scalar{Na})::GL_Scalar{Na,1} where Na
+
+	zero_scalar(fieldargs(S), fieldargs_distrib(S), parts(S))
+
+end 
 
 
 
 function disregard_fieldfactors(p::GL_Product{R}, args...
-																)::AbstractVector{NTuple{R,Int}} where R 
+																)::AbstractVector{Index{R}} where R 
 	
 	disregard_fieldfactors(p.Inds, args...)
 
@@ -1600,21 +1794,20 @@ end
 
 
 function select_fieldfactors(p::GL_Product{R}, args...
-														 )::AbstractVector{NTuple{R,Int}} where R
+														 )::AbstractVector{Index{R}} where R
 
 	select_fieldfactors(p.Inds, args...)
 
 end 
 
-function select_fieldfactor(p::GL_Product{N}, args...)::NTuple{N,Int} where N
+function select_fieldfactor(p::GL_Product{N}, args...)::Index{N} where N
 	
 	select_fieldfactor(p.Inds, args...)
 
 end 
 
 function split_fieldfactor(P::GL_Product{R}, i::Int
-													 )::Tuple{NTuple{R,Int},
-																		AbstractVector{NTuple{R,Int}}
+													 )::Tuple{Index{R}, AbstractVector{Index{R}}
 																		} where R
 
 	split_fieldfactor(P.Inds, i)
@@ -1656,62 +1849,107 @@ end
 	
 
 
+function find_degen(same_item::Function,
+										get_item::Function,
+										n::Int,
+										data...
+										)::Tuple{Vector{Int}, Vector{Vector{Int}}}
 
-function count_unique(p::GL_Product)::Vector{NTuple{2,Int}}#GL_Product}
+	checked = falses(n) 
 
-	n = nr_fields(p)
-
-	checked = falses(n)
 	degen = zeros(Int, n) 
 
-	for (i0,I0) in enumerate_fieldfactors(p)
 
-		checked[i0] && continue 
 
-		checked[i0] = true 
+	for i in 1:n 
 
-		degen[i0] = 1 
+		checked[i] && continue 
 
-		for i1 in i0+1:n 
+		checked[i] = true 
 
-			I0==select_fieldfactor(p,i1) || continue 
+		degen[i] = i
 
-			@assert !checked[i1]  
+		for j in i+1:n 
 
-			checked[i1] = true  
+			same_item(get_item(data...,i), get_item(data...,j)) || continue 
 
-			degen[i0] += 1 
+			@assert !checked[j]  
+
+			checked[j] = true  
+
+			degen[j] = i 
 
 		end 
 
 	end 
 
-	return [(i,nr) for (i,nr) in enumerate(degen) if nr>0]
+	return Utils.Unique(degen; sorted=true, inds=:all)
+
+#	return collect(Utils.EnumUnique(degen;sorted=true))
+
+end  
+
+function find_degen(#same_item::Function,
+										get_item::Function,
+										n::Int,
+										data...
+										)::Tuple{Vector{Int}, Vector{Vector{Int}}}
+
+	find_degen(==, get_item, n, data...)
+
+end 
+
+function find_degen(
+										get_item::Function,
+										data::Union{Tuple,AbstractVector}
+										)::Tuple{Vector{Int}, Vector{Vector{Int}}}
+
+	find_degen(get_item, length(data), data)
+
+end 
+
+function find_degen(data::Union{Tuple,AbstractVector}
+										)::Tuple{Vector{Int}, Vector{Vector{Int}}}
+
+	find_degen(getindex, data)
+
+end 
+
+function count_unique(p::GL_Product)::Vector{NTuple{2,Int}}#GL_Product}
+
+	U,I = find_degen(select_fieldfactor, nr_fields(p), p)
+
+	return [(u,length(i)) for (u,i) in zip(U,I)]
 
 end 
 
 
 
+#function derivative(p::P, I::Tuple{Vararg{Int}})::P where P<:GL_Product
+#
+#	derivative(p, Index(I))
+#
+#end 
 
-function derivative(p::GL_Product{R}, I0::NTuple{R,Int}#AbstractVector{Int}
-										)::GL_Product{R} where R
-
+function derivative(p::P, I0::Index)::P where P<:GL_Product
+	
 	occurences = findall(I0, p)
-
-	isempty(occurences) && return zero(p)
-
+	
+	isempty(occurences) && return zero(p) # degeneracies taken into account 
+	
 	return derivative(p, occurences[1], length(occurences))
-
+	
 end  
 
 
-function derivatives(p::GL_Product{R}
-										 )::Tuple{Vector{NTuple{R,Int}}, Vector{GL_Product{R}}
+function derivatives(p::GL_Product{R},
+										 weight_factor::Number=1,
+										 )::Tuple{Vector{Index{R}}, Vector{GL_Product{R}}
 															} where R
 
 	cu = count_unique(p)
 
-	I = Vector{NTuple{R,Int}}(undef, length(cu))
+	I = Vector{Index{R}}(undef, length(cu))
 
 	P = Vector{GL_Product{R}}(undef, length(cu))
 
@@ -1720,9 +1958,9 @@ function derivatives(p::GL_Product{R}
 
 		(i_1, i_rest) = split_fieldfactor(p,i)
 
-		I[order] = i_1 
+		I[order] = i_1
 
-		P[order] = GL_Product(fieldargs(p), p.Weight*nr, i_rest)
+		P[order] = GL_Product(fieldargs(p), weight_factor*p.Weight*nr, i_rest)
 
 	end 
 
@@ -1849,48 +2087,59 @@ function replace_component(P::T,
 end 
 
 
-function derivative(P::GL_MixedProduct, y::Int, 
-										x::Union{Int,Tuple{Vararg{Int}}}
-										)::GL_MixedProduct 
+function derivative(P::T, y::Int, x::Union{Int,Index}
+										)::T where T<:GL_MixedProduct 
 
 	replace_component(P, derivative(parts(P,y), x), y)
 
 end  
 
+function derivative(P::T, ::Nothing, args...)::T where T<:GL_MixedProduct 
 
-function derivatives(P::GL_MixedProduct, y::Int
-										 )::Tuple{Vector{Tuple{Vararg{Int}}}, 
-															Vector{GL_MixedProduct}}
+	zero(P)
 
-	nz_inds, derivs = derivatives(parts(P, y))
+end 
+
+function derivative(P::T, f::FieldPlaceholder, x::Union{Int,Index},
+										)::T where T<:GL_MixedProduct
+
+					# unique entries 
+
+	derivative(P, findfirst(f, P), x) 
+
+end  
+
+
+
+function derivatives(P::GL_MixedProduct, y::Int,
+										 args...
+										 )::Tuple{Vector{<:Index}, Vector{GL_MixedProduct}}
+
+	nz_inds, derivs = derivatives(parts(P, y), args...)
 
 	return nz_inds, [replace_component(P, d, y) for d in derivs]
 
-#	[derivatives(P, y, i) for i=1:nr_fields(P, y)]
-#
-#	[derivative(P, field, i) for i=1:nr_fields(P, field)]
-#
-#
-#function derivatives(p::GL_Product
-#										 )::Tuple{Matrix{Int},Vector{GL_Product}}
-#	
-#	cu = count_unique(p)
-#
-#	I = Matrix{Int}(undef,field_rank(p),length(cu))
-#
-#	P = Vector{GL_Product}(undef, length(cu))
-#
-#	for (order,(i,nr)) in enumerate(count_unique(p))
-#
-#		setindex!(select_fieldfactor(I, order), select_fieldfactor(p,i), :)
-#
-#		P[order] = GL_Product(p.Weight*nr, disregard_fieldfactors(p,i)) 
-#
-#	end 
-#
-#	return I,P
-#
+end  
+
+function derivatives(P::GL_MixedProduct, 
+										 field::Union{AbstractString,FieldPlaceholder},
+										 args...
+										 )::Tuple{Vector{<:Index}, Vector{GL_MixedProduct}}
+
+	y = findfirst(field, P)
+
+	if isnothing(y) 
+
+		return (Vector{Index}(undef,0),Vector{GL_MixedProduct}(undef,0))
+
+	else 
+
+		return derivatives(P, y, args...)
+
+	end 
+
 end 
+
 
 #===========================================================================#
 #
@@ -2082,6 +2331,137 @@ end
 #---------------------------------------------------------------------------#
 
 
+function derivative(S::GL_Scalar{N}, field_index::Int, args...
+										)::GL_Scalar{N} where N 
+
+	derivative(S, fieldargs(S, field_index), args...)
+
+end 
+
+
+function derivative(S::GL_Scalar{N}, name::AbstractString, args...
+										)::GL_Scalar{N} where N 
+
+	derivative(S, findfirst(name, S), args...)
+
+end 
+
+#function derivative(S::GL_Scalar{N}, 
+#										field::FieldPlaceholder{1},
+#										comp::Int 
+#										)::GL_Scalar{N} where N 
+#
+#	derivative(S, field, Index(comp))
+#
+#end
+
+function derivative(S::GL_Scalar{N}, 
+										field::FieldPlaceholder{R},
+										comp::Index{R}
+										)::GL_Scalar{N} where {R,N}
+
+	field in S || return zero(S)
+
+	return GL_Scalar_(fieldargs(S), fieldargs_distrib(S), S.Weight,
+										Tuple(derivative(P, field, comp) for P in parts(S)))
+
+end 
+
+function flatderiv_get_I(d::AbstractVector, K::AbstractVector, k::Int)::Index 
+
+	i = flatderiv_get_i(K, k)
+	j = flatderiv_get_j(K, k)
+
+	return d[i][1][j]
+
+end 
+
+function flatderiv_get_X(d::AbstractVector, K::AbstractVector, k::Int
+								)
+
+	i = flatderiv_get_i(K, k)
+	j = flatderiv_get_j(K, k)
+
+	return d[i][2][j]
+
+end  
+
+
+function flatderiv_get_i(K::AbstractVector, k::Int)::Int 
+
+	(i,j) = K[k]
+
+	return i
+
+end 
+
+function flatderiv_get_j(K::AbstractVector, k::Int)::Int 
+
+	(i,j) = K[k]
+
+	return j
+
+end 
+
+
+
+
+function derivatives(S::GL_Scalar{N},
+										 field::Union{AbstractString,FieldPlaceholder},
+										 weight_factor::Number=1
+										 )::Tuple{Vector{<:Index}, Vector{GL_Scalar{N}}} where N
+
+	data = [derivatives(P,field,S.Weight*weight_factor) for P in parts(S)]
+
+	J = [(a,b) for (a,(nz_inds,)) in enumerate(data) for b in 1:length(nz_inds)]
+
+
+	isempty(J) && return (Vector{Index}(undef, 0), 
+												Vector{GL_Scalar{N}}(undef, 0))
+
+
+
+
+	K_i, K_p = find_degen(flatderiv_get_I, length(J), data, J)
+
+	return ([flatderiv_get_I(data, J, k) for k in K_i],
+					[zero(S) + sum(flatderiv_get_X(data, J, k) for k in K) for K in K_p]
+					)
+
+end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+function derivatives(T::GL_Tensor{D}, 
+										 field::Union{AbstractString,FieldPlaceholder},
+										 )::Tuple{Vector{NTuple{D+1,Index}},
+															Vector{GL_Scalar}} where D
+
+	data = [derivatives(S,field,T.Weight) for S in parts(T)]
+
+	K = [(a,b) for (a,(nz_inds,)) in enumerate(data) for b in 1:length(nz_inds)] 
+				 
+	return ([join(T.Inds[i], data[i][1][j]) for (i,j) in K],
+					[data[i][2][j] for (i,j) in K]
+					)
+
+end 
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
 
 # high-rank tensors will have few non-vanishing index combinations 
 # stored as in GL_Product 
@@ -2091,56 +2471,141 @@ end
 
 
 #	FieldRank::NTuple{2,Int}
-#Base.length(T::GL_Tensor)::Int = length(T.Components)
+function Base.ndims(T::GL_Tensor{D})::Int where D 
+	
+	D
+
+end 
+
+function Base.size(T::GL_Tensor{D})::NTuple{D,Int} where D 
+
+	T.Dimensions
+
+end 
+
+function Base.size(T::GL_Tensor{D}, i::Int)::Int where D
+
+	@assert 1<=i<=D
+
+	size(T)[i]
+
+end 
+
+#Base.length(T::GL_Tensor)::Int = length(T.Inds)
+
+function Base.getindex(T::GL_Tensor, I::Vararg{Index})::GL_Scalar 
+
+	T[I]
+
+end 
+
+function Base.getindex(T::GL_Tensor, I::Tuple{Vararg{Index}})::GL_Scalar 
+
+	parts(T,findfirst(I,T))
+
+end 
+
+
+function Base.iterate(T::GL_Tensor, state::Int=1)
+
+	state > length(T) && return nothing 
+
+	return (T.Inds[state],parts(T,state)), state+1
+
+end 
+
+
+function Base.join(I::NTuple{N,Index}, i::Index)::NTuple{N+1,Index} where N 
+
+	(I..., i)
+
+end 
+
+#===========================================================================#
 #
-#	# T_i nonzero only for i in columns(Inds)
-#
-##	TensorRank::Int #NTuple{2,Int} 
 #
 #
-##	ArgNrs::Vector{Int} 
-## argument i is taken by the tensor ArgNrs[i]
-#
-#
-#
-#
-#function Base.getindex(T::GL_Tensor, i::Int
-#											 )::Tuple{AbstractVector{Int},GL_Product}
-#
-#	(selectdim(T.Inds, 2, i), T.Components[i])
-#
-#end 
-#
-#
-#function Base.iterate(T::GL_Tensor, state::Int=1)
-#
-#	state > length(T) && return nothing 
-#
-#	return (T[state], state+1)
-#
-#end
-#
-##function Base.getindex(T::GL_Tensor, i0::AbstractVector{Int}
-##											 )::GL_Product
-##
-##	i = findall(i0, T)
-##
-##	return isempty(i) ? zero(T.Components[1]) : T.Components[only(i)]
-##
-##end 
-#
-#	
-#
-##nr_fields(I::AbstractMatrix{Int})::Int = size(I,2)
-#
-#
-#		
+#---------------------------------------------------------------------------#
+
+function GL_Tensor(w::Number, s::NTuple{D,Int}, S::GL_Scalar
+									)::GL_Tensor{D} where D 
+
+	GL_Tensor{D}(w, s, [Tuple(Index(fill(1,r)) for r in s)], [S])
+
+end 
+
+function GL_Tensor(S::GL_Scalar)::GL_Tensor{0}
+
+	GL_Tensor(1.0, (), S)
+
+end 
+
+#===========================================================================#
 #
 #
 #
-#
-#
-##fields = (f1, f1cc, f2, f2cc, f3, f3cc, etc.)
+#---------------------------------------------------------------------------#
+
+
+														 
+
+
+function GL_Tensor_fromDeriv(S::GL_Scalar, 
+														 fields::Vararg{<:Any,D}
+														)::GL_Tensor{D} where D
+
+	GL_Tensor_fromDeriv(GL_Tensor(S), fields...)
+
+end 
+
+function GL_Tensor_fromDeriv(T::GL_Tensor{D},
+														 field::Union{AbstractString,FieldPlaceholder},
+														 fields::Vararg{<:Any,N}
+														 )::GL_Tensor{D+N+1} where {D,N}
+
+	GL_Tensor_fromDeriv(GL_Tensor_fromDeriv(T,field), fields...)
+
+end 
+
+
+function GL_Tensor_fromDeriv(T::GL_Tensor{D}, field::AbstractString
+														 )::GL_Tensor{D+1} where D
+
+	for S in parts(T) 
+
+		i = findfirst(field, S) 
+
+		i isa Int && return GL_Tensor_fromDeriv(T,  fieldargs(S)[i])
+
+		for P in parts(S) 
+
+			j = findfirst(field, P) 
+
+			j isa Int && return GL_Tensor_fromDeriv(T, fieldargs(P)[j])
+
+		end 
+
+	end 
+
+	error("The rank of the field not known")
+
+end 
+
+
+
+function GL_Tensor_fromDeriv(T::GL_Tensor{D}, field::FieldPlaceholder{R}
+														 )::GL_Tensor{D+1} where {D,R}
+
+	inds, scalars = derivatives(T, field)
+	
+	s = (size(T)..., R)
+
+	isempty(inds) && return GL_Tensor(0.0, s, parts(T,nothing))
+
+	return GL_Tensor(1.0, s, inds, scalars)
+
+end 
+
 #
 #function evaluate_component(GLT::GL_Tensor,
 #														i::Int,
@@ -2210,143 +2675,10 @@ end
 
 
 
-#	function GL_DegenerateTerms(class::Int, 
-#															weight::Float64,
-#															coeffs::AbstractVector{GL_MixedProduct}
-#															)::GL_DegenerateTerms
-#
-#		rank = unique(field_rank.(coeffs))
-#
-#		@assert length(rank)==1 "The coeffs should be for the same fields!"
-#
-#		n = unique(sum.(nr_fields.(coeffs)))
-#
-#		@assert length(n)==1 "The coeffs should have the same order!"
-#
-#		return new(class, weight, coeffs)
-#
-#	end 
-#
-#
-#	function GL_DegenerateTerms(class::Int, 
-#															weight::Float64,
-#															coeffs...
-#															)::GL_DegenerateTerms 
-#
-#		GL_DegenerateTerms(class, weight, Utils.flat(coeffs...))
-#
-#	end 
-#
-#	function GL_DegenerateTerms(#class::Int, 
-#															weight::Float64,
-#															c1::Union{Utils.List,GL_MixedProduct},
-#															coeffs...,
-#															)::GL_DegenerateTerms
-#
-#		GL_DegenerateTerms(1, weight, c1, coeffs...)
-#
-#	end 
-#
-#	function GL_DegenerateTerms(#class::Int, 
-#															#weight::Float64,
-##															coeffs::Vararg{GL_MixedProduct}
-#															c1::Union{Utils.List,GL_MixedProduct},
-#															coeffs...,
-#															)::GL_DegenerateTerms
-#
-#		GL_DegenerateTerms(1, 1.0, c1, coeffs...)
-#
-#	end 
-#
-#	function GL_DegenerateTerms(class::Int, 
-#															#weight::Float64,
-#															c1::Union{Utils.List,GL_MixedProduct},
-#															coeffs...#::Vararg{GL_MixedProduct}
-#															)::GL_DegenerateTerms
-#
-#		GL_DegenerateTerms(class, 1.0, c1, coeffs...)
-#
-#	end 
-#
-#end 
-#
-#
-#field_rank(t::GL_DegenerateTerms)::NTuple{2,Int} = field_rank(first(t.Terms))
-#
-#nr_fields(t::GL_DegenerateTerms)::NTuple{2,Int} = nr_fields(first(t.Terms))
-#
-#
-#
-##===========================================================================#
-##
-##
-##
-##---------------------------------------------------------------------------#
-#
-#
-#struct GL_Density 
-#
-#	Coeffs::Vector{Float64}
-#
-#	Terms::Vector{GL_DegenerateTerms}
-#
-##	FieldRank::NTuple{2,Int}
-#
-##	NrFields::NTuple{2,Int} 
-#
-##	function GL_Density(terms::Vararg{<:GL_DegenerateTerms})::GL_Density
-##
-##		GL_Density([t for t in terms])
-##
-##	end 
-#	
-#
-#	function GL_Density(coeffs::Union{Real,AbstractVector{<:Real}},
-#											terms::Vararg{<:GL_DegenerateTerms})::GL_Density
-#
-#		GL_Density(coeffs, [t for t in terms])
-#
-#	end 
-#
-#
-#
-##	function GL_Density(terms::AbstractVector{GL_DegenerateTerms})::GL_Density
-##
-##		new(ones(length(terms)),terms)
-##
-##	end  
-#
-#	function GL_Density(coeffs::Union{Real,AbstractVector{<:Real}},
-#											terms::AbstractVector{GL_DegenerateTerms}
-#											)
-#
-#		@assert length(coeffs)==length(terms)
-#
-#		r = unique(field_rank.(terms))
-#
-#		@assert length(r)==1 && length(unique(only(r)))==1 "Not same fields"
-#
-#		return new(vcat(coeffs), terms)
-#
-#	end 
-#
-#end 
-#
-#
-#field_rank(d::GL_Density)::NTuple{2,Int} = field_rank(first(d.Terms))
-#
-##===========================================================================#
-##
-##
-##
-##---------------------------------------------------------------------------#
-#
-
-
 
 function D4h_density_homog_(a::Union{Real,AbstractVector{<:Real}},
 														b::AbstractVector{<:Real}
-														)::GL_Scalar 
+													 )::GL_Scalar{2}
 	
 	etas = ("eta","eta*")
 
@@ -2374,32 +2706,32 @@ end
 #
 #end 
 #
-#function D4h_density_grad_(k::AbstractVector{<:Real})::GL_Density
-#	
-#	GL_Density(k,
-#														GL_DegenerateTerms(1, 
-#										[GL_MixedProduct(rep([rep(i)])) for i=1:2]),
-#
-#														GL_DegenerateTerms(2, 
-#										[GL_MixedProduct(rep([(i,other[i])])) for i=1:2]),
-#
-#														GL_DegenerateTerms(3, 
-#										[GL_MixedProduct([rep(i)],[rep(other[i])]) for i=1:2]),
-#
-#														GL_DegenerateTerms(4,
-#										[GL_MixedProduct([(i,other[i])],[(other[i],i)]) for i=1:2]),
-#
-#														GL_DegenerateTerms(5, 
-#										[GL_MixedProduct(rep([(3,i)])) for i=1:2])
-#
-#															)
-#
-#end 
-#
-#
-#
-#
-#
+function D4h_density_grad_(k::AbstractVector{<:Real})::GL_Scalar{2}
+
+
+	Ds = ("D","D*")
+
+	return +(
+
+		k[1]*sum(prod(GL_Product(D,rep(i)) for D in Ds) for i=1:2),
+	
+		k[2]*sum(prod(GL_Product(D, [i,other[i]]) for D in Ds) for i=1:2),
+	
+		k[3]*sum(GL_Product("D", rep(i))*GL_Product("D*", rep(other[i])) for i=1:2), 
+	
+		k[4]*sum(GL_Product("D",[i,other[i]])*GL_Product("D*",[other[i],i]) for i=1:2),
+	
+		k[5]*sum(prod(GL_Product(D,[3,i]) for D in Ds) for i=1:2),
+
+		)
+
+
+end 
+
+
+
+
+
 #
 #
 #
@@ -2717,13 +3049,38 @@ function test_derivative(f, f_truth, x, fstep=identity
 
 
 
+#	@show length(ns) length(coef )
+
 
 	truth = f_truth(x) 
+
+#	@show truth 
 
 
 	orders = map(Utils.logspace(1e-2,1e-9,20)) do step 
 
-		appr = sum(f(x + fstep(n*step))*a for (n,a) in zip(ns,coef))/step
+		sep = map(zip(ns,coef)) do (n,a)
+								
+#								@show n a 
+#							
+#								@show x 
+#
+#								@show n*step 
+
+								dx = fstep(n*step)
+
+#								@show dx 
+
+								return f(x + dx)*a 
+							
+							end
+
+#		@show sep 
+#		@show sum(sep)
+
+		appr = sum(sep)/step
+
+#		@show appr 
 
 		return -log10.([step, LinearAlgebra.norm(truth - appr)]) 
 
