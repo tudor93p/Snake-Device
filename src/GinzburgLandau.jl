@@ -1179,11 +1179,19 @@ Base.length(a::Union{GL_Product,GL_MixedProduct,GL_Scalar,GL_Tensor})::Int = len
 
 
 function (i::Index{R})(field::AbstractArray{T,R}
-											 )::T where {R,T<:Union{Float64,ComplexF64}}
+											 )::T where {R,T}#<:Union{Float64,ComplexF64}}
 
 	field[i.I...]
 
-end 
+end  
+
+#function (i::Index{1})(field::Vararg{T,N})::T where {T,N}
+#
+#	field[i.I...]
+#
+#end  
+
+
 
 function (f::FieldPlaceholder{R})(field::A
 																	)::A where {R,
@@ -1200,15 +1208,19 @@ function (p::GL_Product)(field::AbstractArray{T}
 
 	out::promote_type(typeof(p.Weight),T) = p.Weight
 
-	fieldargs(p)(field)  # check shape 
+#	fieldargs(p)(field)  # check shape 
 
 	for I in each_fieldfactor(p) 
-
+		
 		out *= I(field)
 
 	end 
 
+
 	return out 
+
+#	return prod(I(field) for I in each_fieldfactor(p);init=p.Weight)
+#	return prod(field)
 
 end 
 
@@ -1433,10 +1445,38 @@ end
 #---------------------------------------------------------------------------#
 
 
+function Base.:+(ps::Vararg{<:GL_Product})::GL_Scalar 
+
+	+((GL_MixedProduct(p) for p in ps)...)
+
+end  
+
+
+function Base.:-(p::P, q::Q)::GL_Scalar where {T<:Union{GL_Product,GL_Scalar,GL_MixedProduct},P<:T,Q<:T}
+
+	p + (-1.0)*q 
+
+end 
+
+
 
 Base.sum(ps::AbstractVector{<:GL_MixedProduct})::GL_Scalar = GL_Scalar(ps)
 
 Base.:+(ps::Vararg{<:GL_MixedProduct})::GL_Scalar = GL_Scalar(ps)
+
+
+function Base.:+(S::GL_Scalar, P::GL_Product)::GL_Scalar
+
+	S + GL_MixedProduct(P)
+
+end  
+
+function Base.:+(P::GL_Product, S::GL_Scalar)::GL_Scalar
+
+	GL_MixedProduct(P) + S 
+
+end  
+
 
 
 function Base.:+(S::GL_Scalar, P::GL_MixedProduct)::GL_Scalar
@@ -2730,6 +2770,342 @@ end
 
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+function get_field(data, field::Symbol, args...)
+	
+	get_field(data, Val(field), args...)
+
+end  
+
+function get_field(data,fields::Tuple{Vararg{Symbol}})
+
+	[get_field(data,k) for k in fields]
+
+end 
+
+function get_field(((eta0,),), ::Val{:N}, )::Vector{ComplexF64}
+
+	eta0 
+
+end  
+
+
+function get_field((etas,), ::Val{:N}, I::Index{1},
+									 mus::Vararg{Int,Ord})::ComplexF64 where Ord 
+
+	@assert 0<= Ord <= 2
+
+	all(==(0), mus) ? I(etas[Ord+1]) : 0 
+
+end 
+
+
+function get_field((etas,D,), ::Val{:D})::Matrix{ComplexF64}
+
+	D
+
+end 
+
+
+function get_field((etas, D,), ::Val{:D}, I::Index{2})::ComplexF64 
+
+	I(D)
+
+end 
+
+
+function get_field(((eta0,eta1,eta2,),D,txy,), ::Val{:D}, I::Index{2},
+									 mu::Int
+									)::ComplexF64 
+
+	(i,j) = I.I 
+
+	mu==0 && return eta2[i]*txy[j]
+
+	mu==j && return eta1[i]
+
+	return 0
+
+end 
+
+function get_field(data, ::Val{:Dc}, args...)
+	
+	conj(get_field(data, Val(:D), args...))
+
+end  
+
+function get_field(data, ::Val{:Nc}, args...)
+	
+	conj(get_field(data, Val(:N), args...))
+
+
+end 
+
+									 
+
+
+function get_field(((eta0,eta1,eta2,eta3),D,txy,), ::Val{:D}, 
+									 I::Index{2}, mu::Int, nu::Int
+									)::ComplexF64 
+
+	(i,j) = I.I 
+
+	mu==nu==0 && return eta3[i]*txy[j]
+
+	mu==0 && nu==j && return eta2[i]
+	
+	nu==0 && mu==j && return eta2[i]
+
+	return 0
+
+end 
+
+
+
+function eval_fields((f_eta0,f_eta1,f_eta2),
+												t,tx,ty
+												)
+
+	eta0 = f_eta0(t)
+
+	eta1 = f_eta1(t)
+
+	eta2 = f_eta2(t)
+		
+	eta3 = numerical_derivative(f_eta2, t, 1e-4)
+	
+	txy = [tx,ty]
+
+	return ((eta0,eta1,eta2,eta3),
+					chain_rule_outer(eta1, txy),
+					txy)
+
+end 
+
+
+
+
+function get_Data(P::UODict)
+
+	Delta0 = real(only(unique(Hamiltonian.eta_magnitudes(P))))
+	
+	anisotropy = 0#-0.6
+	
+	a = get_coeff_a(Delta0)
+	
+	b = bs_from_anisotropy(anisotropy)
+	
+	K = get_coeffs_Ks(anisotropy,Delta0)
+
+	F = D4h_density_homog_(a,b) + D4h_density_grad_(K) 
+
+
+	fields1 = ["eta","D"]
+	fields2 = ["eta","eta*","D","D*"]
+	fields_symb = ((:N,:D), (:N, :Nc, :D, :Dc))
+
+#	fields1 = fields2 = ["eta","eta*","D","D*"]
+#	fields_symb = ((:N,:Nc,:D,:Dc), (:N, :Nc, :D, :Dc))
+
+
+	dF = Vector{GL_Tensor{1}}(undef, length(fields1))
+	
+	d2F = Matrix{GL_Tensor{2}}(undef, length(fields1), length(fields2))
+
+
+	for (i,field1) in enumerate(fields1)
+
+		dF[i] = GL_Tensor_fromDeriv(F, field1)
+
+		for (j,field2) in enumerate(fields2)
+
+			d2F[i,j] = GL_Tensor_fromDeriv(dF[i], field2) 
+
+		end 
+
+	end 
+		
+	return ((Hamiltonian.eta_interp(P),
+					 Hamiltonian.eta_interp_deriv(P),
+					 Hamiltonian.eta_interp_deriv2(P)
+					 ),
+					(fields_symb, (F, dF, d2F))
+					)
+
+end  
+
+function get_functional((F,),)::GL_Scalar 
+
+	F 
+
+end 
+
+
+function get_functional((F,dF,), i::Int)::GL_Tensor
+
+	dF[i]
+
+end 
+
+
+function get_functional((F,dF,d2F), i::Int, j::Int)::GL_Tensor
+
+	d2F[i,j]
+
+end 
+
+
+
+function eval_derivatives(N::Int, 
+													field_data,
+													(fields1,fields2)::Tuple{NTuple{2,Symbol},
+																									 NTuple{4,Symbol},
+																									 },
+													tensors
+													)::Tuple
+
+
+	field_vals = get_field(field_data, fields2)
+
+	f0::Float64 = ignore_zero_imag(get_functional(tensors)(field_vals...))
+
+	f1 = zeros(Float64, N)
+
+	f2 = zeros(ComplexF64, N, N)
+
+
+
+	for (i_psi,psi) in enumerate(fields1)
+
+		for ((I,),S) in get_functional(tensors,i_psi)
+
+			s = S(field_vals...)
+			
+			for k = 1:N
+
+				f1[k] += 2real(s*get_field(field_data, psi, I, k))
+
+				for n = 1:N
+
+					f2[k,n] += s*get_field(field_data, psi, I, k, n)
+
+				end 
+
+			end 
+
+		end 
+
+
+		for (i_phi,phi) in enumerate(fields2)
+			
+			for ((I,J),S) in get_functional(tensors, i_psi, i_phi)
+
+				s = S(field_vals...)
+				
+				for n=1:N, k=1:N
+	
+					f2[k,n] += *(s,
+											 get_field(field_data, psi, I, k),
+											 get_field(field_data, phi, J, n)
+											 )
+				end 
+		
+			end 
+
+		end 
+
+	end 
+
+	return (f0, f1, 2real(f2)) 
+
+
+
+end 
+
+function eval_derivatives(N::Int, 
+													data,
+													(fields,)::NTuple{2,NTuple{4,Symbol}},
+													tensors
+													)::Tuple
+
+#function eval_derivatives(N::Int, 
+#													field_data,
+#													fields::NTuple{4,Symbol},
+#													tensors
+#													)::Tuple
+
+	field_vals = get_field(data, fields)
+
+	f0 = get_functional(tensors)(field_vals...)
+
+	f1 = zeros(ComplexF64, N)
+
+	f2 = zeros(ComplexF64, N, N)
+
+
+	for (i_psi,psi) in enumerate(fields)
+
+		for ((I,),S) in get_functional(tensors, i_psi)
+
+			s = S(field_vals...)
+			
+			for k = 1:N
+
+				f1[k] += s*get_field(data, psi, I, k)
+
+				for n = 1:N
+
+					f2[k,n] += s*get_field(data, psi, I, k, n)
+
+				end 
+
+			end 
+
+		end 
+
+
+		for (j_phi,phi) in enumerate(fields)
+			
+			for ((I,J),S) in get_functional(tensors, i_psi, j_phi) 
+
+				s = S(field_vals...)
+				
+				for n=1:N,k=1:N
+					
+					f2[k,n] += *(s,
+											 get_field(data, psi, I, k),
+											 get_field(data, phi, J, n)
+											 )
+	
+				end 
+
+			end 
+	
+		end 
+
+	end 
+
+	return (ignore_zero_imag(f0),
+					ignore_zero_imag.(f1),
+					ignore_zero_imag.(f2))
+
+end 
+
+
+	
+
+
+
+
+
+
+
 
 
 #
@@ -3007,20 +3383,20 @@ function D4h_density_homog_deriv(eta::AbstractVector{<:Number},
 	
 #	F = D4h_density_homog(eta, coeffs_ord2, coeffs_ord4)
 #
-#	for step in Utils.logspace(1e-2,1e-10,20)
+#	for dx in Utils.logspace(1e-2,1e-10,20)
 #
-#		D = [D4h_density_homog(eta + [step,0], etac, coeffs_ord2,coeffs_ord4),
-#				 D4h_density_homog(eta + [0,step], etac, coeffs_ord2,coeffs_ord4),
+#		D = [D4h_density_homog(eta + [dx,0], etac, coeffs_ord2,coeffs_ord4),
+#				 D4h_density_homog(eta + [0,dx], etac, coeffs_ord2,coeffs_ord4),
 #				 ]
 #
 #		C = [
-#				 D4h_density_homog(eta, etac + [step,0], coeffs_ord2,coeffs_ord4),
-#				 D4h_density_homog(eta, etac + [0,step], coeffs_ord2,coeffs_ord4),
+#				 D4h_density_homog(eta, etac + [dx,0], coeffs_ord2,coeffs_ord4),
+#				 D4h_density_homog(eta, etac + [0,dx], coeffs_ord2,coeffs_ord4),
 #				 ]
 #
-#		ords = ord, ord_d, ord_c = -log10.([step,
-#						 LinearAlgebra.norm(d-(D .- F)/step),
-#						 LinearAlgebra.norm(c-(C .- F)/step)]) 
+#		ords = ord, ord_d, ord_c = -log10.([dx,
+#						 LinearAlgebra.norm(d-(D .- F)/dx),
+#						 LinearAlgebra.norm(c-(C .- F)/dx)]) 
 #
 #		@assert ord_d > ord/2 
 #		@assert ord_c > ord/2 
@@ -3033,19 +3409,32 @@ function D4h_density_homog_deriv(eta::AbstractVector{<:Number},
 end 
 
 
+function numerical_derivative(f::Function, 
+															x::Union{Number,AbstractArray{<:Number}},
+															dx::Float64,
+															fstep::Function=identity
+															)::Union{Number,AbstractArray{<:Number}}
+
+#	coef2 = [-1/2, 0, 1/2]
+
+#	coef8 = [1/280, -4/105, 1/5, -4/5, 0, 4/5, -1/5, 4/105, -1/280]
+
+	coef = [1/12, -2/3, 2/3, -1/12]
+
+	N = div(length(coef),2) 
+
+	ns = vcat(-N:-1,1:N)
+
+
+	return sum(a * f(x + fstep(n*dx)) for (n,a) in zip(ns,coef))/dx 
+
+end 
+
+
 
 function test_derivative(f, f_truth, x, fstep=identity
 												)::Bool
 
-	coef2 = [-1/2, 0, 1/2]
-
-	coef8 = [1/280, -4/105, 1/5, -4/5, 0, 4/5, -1/5, 4/105, -1/280]
-
-	
-	
-	coef = coef8 
-
-	ns = axes(coef,1) .- div(length(coef)+1,2)
 
 
 
@@ -3057,32 +3446,11 @@ function test_derivative(f, f_truth, x, fstep=identity
 #	@show truth 
 
 
-	orders = map(Utils.logspace(1e-2,1e-9,20)) do step 
+	orders = map(Utils.logspace(1e-2,1e-9,20)) do dx 
 
-		sep = map(zip(ns,coef)) do (n,a)
-								
-#								@show n a 
-#							
-#								@show x 
-#
-#								@show n*step 
+		a = numerical_derivative(f, x, dx, fstep)
 
-								dx = fstep(n*step)
-
-#								@show dx 
-
-								return f(x + dx)*a 
-							
-							end
-
-#		@show sep 
-#		@show sum(sep)
-
-		appr = sum(sep)/step
-
-#		@show appr 
-
-		return -log10.([step, LinearAlgebra.norm(truth - appr)]) 
+		return -log10.([dx, LinearAlgebra.norm(truth - a)]) 
 
 	end  
 
@@ -3220,7 +3588,7 @@ end
 
 function D4h_density_grad_deriv(D::AbstractMatrix{<:Number},
 													Dc::AbstractMatrix{<:Number},
-													coeffs_ord2::AbstractVector{<:Real}
+													coeffs_ord2::AbstractVector{<:Real},
 													)::NTuple{2,Matrix{ComplexF64}}
 
 	@assert size(D) == size(Dc) == (3,2) 
@@ -3242,7 +3610,7 @@ function D4h_density_grad_deriv(D::AbstractMatrix{<:Number},
 	
 #	G = D4h_density_grad(D,Dc,coeffs_ord2)
 #
-#	for step in Utils.logspace(1e-2,1e-10,20)
+#	for dx in Utils.logspace(1e-2,1e-10,20)
 #
 #		d2 = zeros(ComplexF64,3,2)
 #		c2 = zeros(ComplexF64,3,2)
@@ -3251,15 +3619,15 @@ function D4h_density_grad_deriv(D::AbstractMatrix{<:Number},
 #	
 #			x = zeros(ComplexF64,3,2)
 #	
-#			x[i,j] += step 
+#			x[i,j] += dx 
 #			
-#			d2[i,j] = (D4h_density_grad(D+x,Dc,coeffs_ord2)-G)/step
+#			d2[i,j] = (D4h_density_grad(D+x,Dc,coeffs_ord2)-G)/dx
 #	
-#			c2[i,j] = (D4h_density_grad(D,Dc+x,coeffs_ord2)-G)/step
+#			c2[i,j] = (D4h_density_grad(D,Dc+x,coeffs_ord2)-G)/dx
 #	
 #		end 
 #
-#		ords = ord, ord_d, ord_c = -log10.([step, 
+#		ords = ord, ord_d, ord_c = -log10.([dx, 
 #																				LinearAlgebra.norm(d - d2),
 #																				LinearAlgebra.norm(c - c2)])
 #	
@@ -3474,78 +3842,55 @@ end
 
 
 
-function D4h_density_1D(P::UODict)::Function 
-
-	f_eta = Hamiltonian.eta_interp(P)
-			
-	f_etaJ = Hamiltonian.eta_interp_deriv(P)
-	
-	f_etaH = Hamiltonian.eta_interp_deriv2(P)
-	
-	Delta0 = real(only(unique(Hamiltonian.eta_magnitudes(P))))
-	
-	anisotropy = 0#-0.6
-	
-	a = GL.get_coeff_a(Delta0)
-	
-	b = GL.bs_from_anisotropy(anisotropy)
-	
-	K = GL.get_coeffs_Ks(anisotropy,Delta0)
-
-#		A = zeros(3)
-#		gamma = 0
-
-	function out(g::Real,grad_g::AbstractVector{<:Real} 
-							 )::Vector{Float64}
-
-		N = f_eta(g) 
-		
-		dN_dg = f_etaJ(g)
-	
-
-		dN_dx = chain_rule_outer(dN_dg, grad_g) # already covariant 
-		
-
-		F = D4h_density_homog(N,a,b) +  D4h_density_grad(dN_dx,K) 
-
-		dF_dN = D4h_density_homog_deriv(N, a, b)
-		
-		dF_dg = chain_rule_inner(dF_dN, dN_dg)
-
-
-		dF_dgx,dF_dgy = chain_rule_inner(D4h_density_grad_deriv(dN_dx,K), dN_dg) 
-
-
-		d2N_dg2 = f_etaH(g)
-
-		aux = chain_rule_inner(transpose(dN_dg), dN_dg', D4h_density_homog_deriv2(N, a, b)...)[:]
-		
-		d2Fh_dg2 = chain_rule_inner(dF_dN,d2N_dg2) + chain_rule_inner(aux, dN_dg)
-
-
-		return [F, 
-						2real(dF_dg), 2real(dF_dgx), 2real(dF_dgy),
-						2real(d2Fh_dg2 + d2Fg_dg2)
-						]
-
-
-
-
-
-	end 
-	 
-
-
-
-
-end 
-
-
 #===========================================================================#
 #
 #
 #
 #---------------------------------------------------------------------------#
+
+
+#function decompose_outer(s::AbstractMatrix)
+#
+#	svd = LinearAlgebra.svd(s)
+#
+#	@show svd.S 
+#
+#	i = findlast(>(1e-10)∘abs,svd.S)
+#	
+#	return svd.S[i] * svd.U[:,i], svd.Vt[i,:]
+#
+#end 
+
+function central_diff(h::Real,s::Real)#::GL_Tensor
+
+
+#	BL = GL_Product("G",[1,1])
+#
+#	BR = GL_Product("G",[2,1])
+#
+#	UL = GL_Product("G",[1,2])
+#
+#	UR = GL_Product("G",[2,2]) 
+#
+#
+#	return GL_Tensor{1}(1.0,
+#											(1,),
+#											[tuple(Index(i)) for i in 1:3],
+#											[0.25*(BL + BR + UL + UR),
+#											 (0.5/h)*(BR-BL + UR-UL),
+#											 (0.5/s)*(UR-BR + UL-BL)
+#											]
+#											)
+
+
+	(hcat([0,0],	 [1,0], [0,1], [1,1]), 
+	 [0.25,0.5/h,0.5/s],
+	 hcat([1,1,1,1], [-1,1,-1,1,], [-1,-1,1,1,])
+	 )
+
+
+
+end 
 
 
 function dAdg(M::AbstractMatrix{Tm},
@@ -3557,24 +3902,46 @@ function dAdg(M::AbstractMatrix{Tm},
 	n,m = size(M)
 
 	D = zeros(promote_type(Tm,Tx,Ty), n+1,m+1)
+	
+#	P,w,S = central_diff(h,s)
 
-	for (j,cols_j) in enumerate(zip(eachcol(M),eachcol(X),eachcol(Y))) 
 
-		for (i,(m,x,y)) in enumerate(zip(cols_j...))
+	for j=1:m,i=1:n 
 
-			D[i,j] += m - x - y
+		m_= M[i,j]
+		x = X[i,j]
+		y = Y[i,j]
 
-			D[i+1,j] += m + x - y 
+		D[i,j] += m_ - x - y
 
-			D[i,j+1] += m - x + y 
+		D[i+1,j] += m_ + x - y 
 
-			D[i+1,j+1] += m + x + y 
+		D[i,j+1] += m_ - x + y 
 
-		end 
-		
+		D[i+1,j+1] += m_ + x + y 
+
 	end 
 
 	D .*= s*h 
+
+	return D 
+
+end 
+
+function dAdg(MXY::AbstractArray{T,3}, h::Float64, s::Float64
+							)::Matrix{promote_type(T,Float64)} where T<:Number 
+
+	n,m, = size(MXY)
+
+	P,w,S = central_diff(h,s)
+
+	D = zeros(promote_type(T,Float64), n+1, m+1) 
+
+	for k=1:3, j=1:m, i=1:n, l=1:4
+
+		D[i+P[1,l],j+P[2,l]] += s*h*S[l,k]*MXY[i,j,k]
+	
+	end 
 
 	return D 
 
@@ -3587,29 +3954,89 @@ end
 #
 #end 
 
-function m_dx_dy(g::AbstractMatrix{<:Number},h::Real,s::Real
-								 )::NTuple{3,Matrix}
+function M_X_Y(midg::AbstractMatrix{Tm},
+							 dgdx::AbstractMatrix{Tx},
+							 dgdy::AbstractMatrix{Ty},
+							 h::Real, s::Real,
+							 data
+							 )::Array{promote_type(T,Float64),3
+												} where {T<:Number,Tm<:T,Tx<:T,Ty<:T}
 
-	n,m = size(g) 
+	n,m = size(midg)
+
+	W = central_diff(h,s)[2]
+
+	MXY = ones(promote_type(T,Float64), n, m) .* reshape(W, 1,1,:)
 
 
-	M = fill(0g[1] + 0.25, n-1, m-1)
-	
-	dX = fill(0g[1] + h/2, n-1, m-1)
-	
-	dY = fill(0g[1] + s/2, n-1, m-1)
-	
+	for j=1:m,i=1:n
 
+		f,df,d2f = g04(data, midg[i,j], dgdx[i,j], dgdy[i,j])
 
-	for j=1:m-1, i=1:n-1 
-
-		M[i,j]  *=  g[i,j] + g[i+1,j] + g[i,j+1] + g[i+1,j+1]
-		dX[i,j] *= -g[i,j] + g[i+1,j] - g[i,j+1] + g[i+1,j+1]
-		dY[i,j] *= -g[i,j] - g[i+1,j] + g[i,j+1] + g[i+1,j+1]
+		MXY[i,j,:] .*= df 
 
 	end 
 	
-	return M,dX,dY
+	return MXY 
+
+end 
+
+
+function M_X_Y_2(midg::AbstractMatrix{Tm},
+							 dgdx::AbstractMatrix{Tx},
+							 dgdy::AbstractMatrix{Ty},
+							 h::Real, s::Real,
+							 data
+							 )::Array{promote_type(T,Float64),4
+												} where {T<:Number,Tm<:T,Tx<:T,Ty<:T}
+
+
+	n,m = size(midg)
+
+	w = central_diff(h,s)[2]
+
+	MXY2 = reshape(w'.*w,3,3,1,1) .* ones(promote_type(T,Float64),1,1,n,m)
+
+	for j=1:m,i=1:n 
+		
+		F,dF,d2F = g04(data, midg[i,j], dgdx[i,j], dgdy[i,j])
+
+		MXY2[:,:,i,j] .*= d2F 
+
+	end 
+
+	return MXY2
+
+end 
+
+
+
+function m_dx_dy(g::AbstractMatrix{T},h::Real,s::Real
+								 )::NTuple{3,Matrix} where T<:Number
+
+	n,m = size(g) .-1
+
+
+#	M = zeros(promote_type(T,Float64), n, m)
+#	X = zeros(promote_type(T,Float64), n, m)
+#	Y = zeros(promote_type(T,Float64), n, m)
+	
+	M = fill(promote_type(T,Float64)(0.25), n, m)
+
+	X = fill(promote_type(T,Float64)(0.5/h), n, m)
+
+	Y = fill(promote_type(T,Float64)(0.5/s), n, m)
+	
+
+	for j=1:m, i=1:n
+
+		M[i,j] *=  g[i,j] + g[i+1,j] + g[i,j+1] + g[i+1,j+1]
+		X[i,j] *= -g[i,j] + g[i+1,j] - g[i,j+1] + g[i+1,j+1]
+		Y[i,j] *= -g[i,j] - g[i+1,j] + g[i,j+1] + g[i+1,j+1]
+
+	end 
+	
+	return M,X,Y
 
 end 
 
@@ -3624,8 +4051,115 @@ function middle_Riemann_sum(F::Function,
 
 	h*s*mapreduce(F, +, M, dX, dY; init=0.0)
 
-	return f 
+end 
 
+function g04((etas, tensors), T::Vararg{<:Real,N}) where N
+
+	field_data = eval_fields(etas, T...)
+
+	return eval_derivatives(N, field_data, tensors...)
+
+end 
+
+function dAdg_(midg::AbstractMatrix{Tm},
+							dgdx::AbstractMatrix{Tx},
+							dgdy::AbstractMatrix{Ty},
+							h::Float64,s::Float64,
+							data,
+							) where {Tm<:Number,Tx<:Number,Ty<:Number}
+
+	n,m = size(midg)
+
+	L = (n+1)*(m+1)
+
+	T = promote_type(Tm,Tx,Ty,Float64)
+
+	P,w,S = central_diff(h,s)
+
+	W = w' .* S
+
+	A::Float64 = 0.0
+	 
+	dA = zeros(T,L)
+
+	d2A = zeros(T,L,L)
+	
+	Li = LinearIndices((1:n+1,1:m+1))
+
+
+	@assert all(==(0),P[:,1])
+
+	ij = Vector{Int}(undef,2) 
+
+	a = Vector{T}(undef, 3) 
+
+	IJ = Vector{Int}(undef,2)
+
+
+
+	for j=1:m+1,i=1:n+1, k=1:4  #corners of the square 
+	
+		ij[1] = i - P[1,k] 
+	
+		1<=ij[1]<=n || continue
+		
+	
+		ij[2] = j - P[2,k]
+
+		1<=ij[2]<=m || continue 
+
+
+
+
+		F,dF,d2F = g04(data, midg[ij...], dgdx[ij...], dgdy[ij...]) 
+
+
+		if k==1
+	
+			A += F
+	
+		end 
+ 
+
+		IJ[1] = Li[i,j] 
+
+		dA[IJ[1]]  += h*s*LinearAlgebra.dot(selectdim(W, 1, k), dF)
+
+		a[:] = selectdim(W, 1, k:k)*d2F
+	
+		a.*=h*s
+
+		for q=1:4 
+
+			IJ[2] = Li[ij[1]+P[1,q], ij[2]+P[2,q]]
+
+			d2A[IJ...] += LinearAlgebra.dot(a, view(W,q,:)) 
+
+			continue
+
+			LinearAlgebra.dot(a, view(W,q,:))≈0 && continue 
+
+#			println(abs(ij[1]+P[1,q]-i), "  ", abs(ij[2]+P[2,q]-j),"  ",IJ)
+
+			if abs(-(IJ...)) > 15
+
+						println((i,j),"\t",(ij[1]+P[1,q],ij[2]+P[2,q]),"  ",IJ,
+										"\t",
+										abs(ij[1]+P[1,q]-i)+abs(ij[2]+P[2,q]-j))
+
+			end 
+			if abs(ij[1]+P[1,q]-i)>1 || abs(ij[2]+P[2,q]-j)>1 
+
+				@show i j 
+			end 
+
+		end 
+
+	end  
+
+	
+	return h*s*A, dA, d2A 
+	
 end 
 
 
@@ -3635,26 +4169,52 @@ end
 
 
 
+function d2Adg2_(MXY2::AbstractArray{T,4},
+											h::Float64, s::Float64) where {T<:Number}
+
+	n,m = size(MXY2)[3:4]
+
+	P,w,S = central_diff(h,s)
+
+	L = (n+1)*(m+1) 
 
 
+	d2A = zeros(T,L,L)
+	
+	Li = LinearIndices((1:n+1,1:m+1))
 
 
+	QWE = Vector{Int}(undef,4)
+
+	aa = Matrix{T}(undef,4,4) 
 
 
+	for j=1:m,i=1:n 
+		
+		aa .= h*s*S*MXY2[:,:,i,j]*S'
 
+		for k in 1:4
 
+#			dA[QWE[k]] = h*s*LinearAlgebra.dot(selectdim(W, 1, k), dF) 
 
+			QWE[k] = Li[i+P[1,k], j+P[2,k]]
 
+			d2A[QWE[k],QWE[k]] += aa[k,k]  
 
+			for q=1:k-1 
 
+				d2A[QWE[k],QWE[q]] += aa[k,q]
+				d2A[QWE[q],QWE[k]] += aa[k,q]
 
+			end 
 
+		end 
 
+	end 
 
+	return d2A 
 
-
-
-
+end 
 
 
 
