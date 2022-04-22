@@ -146,7 +146,6 @@ function (P::MixedProduct{N})(fields::Vararg{<:AbstractArray,N}
 
 	out = P.Weight 
 
-	
 	for (p,f) in zip(parts(P),fields) 
 
 		out *= p(f)

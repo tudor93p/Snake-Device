@@ -11,12 +11,15 @@ module CentralDiff
 #
 #---------------------------------------------------------------------------#
 
-
+const CD_P = (CartesianIndices((0:1,)), CartesianIndices((0:1,0:1)))
+const CD_S = (hcat([1,1], [-1,1]),
+							hcat([1,1,1,1], [-1,1,-1,1,], [-1,-1,1,1,]))
 
 function central_diff_PS(h::Real,s::Real
 											)::Tuple{Matrix{Int},Matrix{Int}}
 
-	(hcat([0,0],	 [1,0], [0,1], [1,1]), 
+	(
+	hcat([0,0],	 [1,0], [0,1], [1,1]), 
 	 hcat([1,1,1,1], [-1,1,-1,1,], [-1,-1,1,1,])
 	 )
 
@@ -67,9 +70,16 @@ end
 #
 #---------------------------------------------------------------------------#
 
+function xyz_neighb( I::CartesianIndex,
+											 P::AbstractMatrix{Int},
+											 k::Int)#::Tuple{Vararg{Int}}
+			
+	CartesianIndex(Tuple(i+P[n,k] for (n,i) in enumerate(Tuple(I))))
+				
+end 
 
-function xyz_neighb(#g::AbstractArray{T,N}
-											 I::NTuple{N,Int},
+
+function xyz_neighb( I::NTuple{N,Int},
 											 P::AbstractMatrix{Int},
 											 k::Int)::NTuple{N,Int} where N#{T<:Number,N}
 										
@@ -85,18 +95,7 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function iter_inds(ns::Tuple{Vararg{Int}}
-									)::Base.Iterators.ProductIterator
 
-	Base.product((1:n for n in ns)...)
-
-end 
-
-function iter_inds(A::AbstractArray)::Base.Iterators.ProductIterator 
-
-	iter_inds(size(A))
-
-end 
 
 
 #===========================================================================#
@@ -113,19 +112,23 @@ function collect_midval_deriv(A::AbstractArray{T,N1},
 
 	@assert N1==N+1 && N in 1:2 
 
+	s = size(A)[2:N1] 
 
-	P,W = central_diff_PW2(steps...)
+	D = zeros(promote_type(T,Float64), (s.+1)...)
 
-	D = zeros(promote_type(T,Float64), (size(A)[2:N1] .+ 1)...)
+	@simd for xyz=CartesianIndices(s) 
+		@simd	for a=1:N+1
+			@simd for ngh=1:2^N
+				
+				@inbounds D[xyz + CD_P[N][ngh]] += CD_S[N][ngh, a] * A[a, xyz]
 
-
-	for ngh=1:2^N, xyz=iter_inds(D), a=1:N+1 
-
-		D[xyz_neighb(xyz, P, ngh)...] += W[ngh, a] * A[a, xyz...]
-
+			end 
+		end 
 	end 
 
-	return D 
+	D .*= volume_element(steps...) 
+
+	return D  
 
 end 
 
@@ -134,21 +137,25 @@ end
 
 
 function midval_and_deriv(g::AbstractArray{T,N},
-																		steps::Vararg{Real,N}
-																		)::Array{promote_type(T,Float64),N+1
+													steps::Vararg{Real,N}
+													)::Array{promote_type(T,Float64),N+1
 																						 } where {T<:Number,N}
 	@assert N in 1:2 
 
-	P,W = central_diff_PW1(steps...) 
+	w = central_diff_w(steps...) 
 
 	s = size(g) .- 1
 
 	A = zeros(promote_type(T,Float64), N+1, s...)
 
-	for xyz in iter_inds(s), a=1:N+1, ngh=1:2^N 
+	@simd for xyz=CartesianIndices(s) 
+		@simd for a=1:N+1 
+			@simd for ngh=1:2^N 
 
-		A[a, xyz...] += g[xyz_neighb(xyz, P, ngh)...] * W[ngh,a]
+				@inbounds A[a, xyz] += g[xyz + CD_P[N][ngh]] * CD_S[N][ngh,a] * w[a]
 
+			end 
+		end 
 	end 
 	
 	return A 
@@ -167,8 +174,7 @@ end
 #---------------------------------------------------------------------------#
 
 
-function mvd_container(MXY::AbstractArray
-																	 )::Base.Generator 
+function mvd_container(MXY::AbstractArray)::Base.Generator 
 	eachslice(MXY, dims=1)
 
 end  
@@ -180,9 +186,14 @@ function mvd_container(MXY::AbstractArray{T},
 
 end  
 
+function mvd_container(MXY::AbstractArray{T},
+																	 I::CartesianIndex
+																	 )::AbstractVector{T}  where T
+	view(MXY, :, I)
 
-function mvd_container(MXY::T
-																	 )::T where T<:Tuple{Vararg{AbstractArray}}
+end  
+
+function mvd_container(MXY::T)::T where T<:Tuple{Vararg{AbstractArray}}
 
 	MXY 
 
@@ -196,6 +207,12 @@ function mvd_container(MXY::T, I::Tuple{Vararg{Int}}
 end 
 
 
+function mvd_container(MXY::T, I::CartesianIndex 
+																	 )::Base.Generator where T<:Tuple{Vararg{AbstractArray}}
+
+	(M[I] for M in MXY)
+
+end 
 
 
 
@@ -219,7 +236,7 @@ function mid_Riemann_sum(data,
 
 	out::promote_type(T,Float64) = 0.0 
 
-	for I in iter_inds(first(mvd_container(A)))
+	for I in CartesianIndices(first(mvd_container(A)))
 	
 		out += F(data, mvd_container(A, I)...)
 
@@ -243,7 +260,7 @@ function mid_Riemann_sum(data,
 
 	out = zeros(promote_type(T,Float64), output_size...)
 
-	for I in iter_inds(first(mvd_container(A)))
+	for I in CartesianIndices(first(mvd_container(A)))
 	
 		out += F(data, mvd_container(A, I)...)
 
@@ -272,7 +289,7 @@ function eval_fct_on_mvd(data,
 												output_size::NTuple{M,Int},
 												steps::Vararg{Real,N}
 												)::Array{promote_type(T,Float64),N+M
-																 } where {T,N,N1,M}
+																 } where {T<:Number,N,N1,M}
 
 	@assert N+1==N1 && N in 1:2 
 	
@@ -283,15 +300,43 @@ function eval_fct_on_mvd(data,
 
 	I0 = fill(Colon(),M)
 
-	for I in iter_inds(s)
+	for I in CartesianIndices(s)
 
-		out[I0..., I...] = F(data, mvd_container(A,I))
+		out[I0..., I] = F(data, mvd_container(A,I)...)
 
 	end 
 	
 	return out 
 
 end 
+
+
+function eval_fct_on_mvd!(
+												out::AbstractArray{T1,MN},
+												data, 
+												F!::Function,
+												A::Union{AbstractArray{T2,N1}, 
+																 NTuple{N1,AbstractArray{T2,N}}},
+												output_size::NTuple{M,Int},
+												steps::Vararg{Real,N}
+												)::Nothing  where {T1<:Number,T2<:Number,N,N1,M,MN}
+
+	@assert N+1==N1 && N in 1:2 && MN==M+N 
+	
+	I0 = fill(Colon(),M)
+
+	for I in CartesianIndices(size(out)[M+1:MN])
+
+		F!(view(out, I0..., I), data, mvd_container(A,I)...)
+
+	end 
+	
+	return 
+
+end 
+
+
+
 
 
 

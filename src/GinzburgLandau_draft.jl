@@ -15,9 +15,9 @@ using Constants: MAIN_DIM
 
 import ..Lattice, ..Hamiltonian 
 
-import ..utils, ..Taylor 
+import ..utils, ..Taylor, ..CentralDiff
 
-
+const WARN_OBSOLETE = false 
 
 #===========================================================================#
 #
@@ -25,6 +25,11 @@ import ..utils, ..Taylor
 #
 #---------------------------------------------------------------------------#
 
+function warn(w::Bool=WARN_OBSOLETE) 
+
+	WARN_OBSOLETE && @warn "Obsolete function"
+
+end 
 
 
 
@@ -67,6 +72,16 @@ D4h_grad_ord2 = [
 
 
 
+function iterate_GL_terms(coeffs::AbstractVector{<:Real},
+													indsets::AbstractVector{<:Tuple{<:Real,<:AbstractVector}}
+													)::Base.Iterators.Flatten
+
+	@assert length(coeffs) == length(indsets)
+
+	((c1*c2,comb) for (c1,(c2,combs)) in zip(coeffs,indsets) for comb in combs)
+	
+end 
+
 #===========================================================================#
 #
 #
@@ -85,6 +100,175 @@ D4h_grad_ord2 = [
 
 
 
+
+
+
+function BCS_coherence_length(Delta0::Real)::Float64
+
+	0.7/Delta0
+
+end  
+
+function eta_magnitude_squared(Delta0::Real)::Float64 
+
+	2*Delta0^2
+
+end 
+
+function get_K_ampl(Delta0::Real,b::Real=1)::Float64 
+
+	2b*eta_magnitude_squared(Delta0)*BCS_coherence_length(Delta0) 
+
+end 
+
+function get_coeff_a(Delta0::Real,b::Real=1)::Vector{Float64}
+
+	[-eta_magnitude_squared(Delta0)*b]
+
+end 
+
+
+function covariant_derivative(etaJacobian::T
+															)::T where T<:AbstractMatrix{<:Number}
+	etaJacobian 
+
+end  
+
+
+function covariant_derivative(
+															etaJacobian::AbstractMatrix{<:Number},
+															eta::AbstractVector{<:Number},
+															A::AbstractVector{<:Number},
+															gamma::Real,
+															)::Matrix{ComplexF64}
+
+	@assert size(etaJacobian)==(3,2)
+
+	etaJacobian + im*gamma*A*transpose(eta)
+
+end 
+
+
+function covariant_derivative_deriv_eta(
+															etaJacobian::AbstractMatrix{<:Number},
+															eta::AbstractVector{<:Number},
+															A::AbstractVector{<:Number},
+															gamma::Real,
+															)::NTuple{2,Matrix{ComplexF64}}
+
+	@assert size(etaJacobian)==(3,2)
+
+	(A*[im*gamma 0], A*[0 im*gamma])
+
+end 
+
+
+function covariant_derivative_deriv_A(
+															etaJacobian::AbstractMatrix{<:Number},
+															eta::AbstractVector{<:Number},
+															A::AbstractVector{<:Number},
+															gamma::Real,
+															)::NTuple{3,Matrix{ComplexF64}}
+
+	@assert size(etaJacobian)==(3,2)
+
+	([im*gamma 0 0]*transpose(eta), 
+	 [0 im*gamma 0]*transpose(eta), 
+	 [0 0 im*gamma]*transpose(eta)
+	 )
+
+end 
+
+
+
+
+
+function chain_rule_outer(dF_df::AbstractVector{T1},
+										df_dx::AbstractVector{T2}
+										)::Matrix{promote_type(T1,T2)} where {T1<:Number,T2<:Number}
+
+	df_dx * transpose(dF_df)
+
+end 
+
+
+
+
+
+function chain_rule_inner(dF_df::AbstractVector{T1},
+										df_dx::AbstractVector{T2}
+										)::promote_type(T1,T2) where {T1<:Number,T2<:Number}
+
+	mapreduce(*,+,dF_df,df_dx;init=0.0)
+
+end 
+
+function chain_rule_inner(dF_df::AbstractMatrix{T1},
+										df_dx::AbstractVecOrMat{T2}
+										)::Array{promote_type(T1,T2),N} where {T1<:Number,T2<:Number,N}
+
+	dF_df*df_dx
+
+end 
+
+function chain_rule_inner(A::AbstractVecOrMat,B::AbstractVecOrMat,
+													a::AbstractVecOrMat,b::AbstractVecOrMat
+													)
+	chain_rule_inner(A,a) + chain_rule_inner(B,b)
+																	
+end  
+
+
+
+chain_rule_inner(t::Tuple) = chain_rule_inner(t...)
+chain_rule_inner(t1::Tuple,t2::Tuple) = chain_rule_inner(t1...,t2...)
+
+
+
+	
+
+
+
+
+
+
+function curl(Jacobian::AbstractMatrix{T})::Vector{T} where T<:Number 
+
+	@assert LinearAlgebra.checksquare(Jacobian)==3 
+
+	C = zeros(T,3)
+
+	for (i,j,k) in Combinatorics.permutations(1:3)
+
+		C[i] += Combinatorics.levicivita_lut[i,j,k]*Jacobian[j,k]
+
+	end 
+
+	return C
+
+end 
+
+																		
+
+
+
+function bs_from_anisotropy(nu::Real,b::Real=1)::Vector{Float64}
+
+	[(3+nu)/8, (1-nu)/4, - (3nu+1)/4]*b
+
+end 
+
+function Ks_from_anisotropy(nu::Real,K::Real)::Vector{Float64}
+
+	vcat(3+nu, fill(1-nu,3), 0)*K/4 
+	
+end 
+
+function get_coeffs_Ks(nu::Real,Delta0::Real,b::Real=1)::Vector{Float64}
+
+	Ks_from_anisotropy(nu,get_K_ampl(Delta0,b))
+
+end  
 
 
 
@@ -199,7 +383,9 @@ function get_field(data, field::Symbol, args...)
 
 end  
 
-function get_field(data,fields::Tuple{Vararg{Symbol}})
+function get_field(data,fields::Union{AbstractVector{Symbol},
+																		 Tuple{Vararg{Symbol}}},
+									 )::Vector{VecOrMat{ComplexF64}}
 
 	[get_field(data,k) for k in fields]
 
@@ -284,27 +470,47 @@ end
 
 
 
-eval_fields(data, t,tx)  = eval_fields(data, t, tx, 0)
-
-function eval_fields((f_eta0,f_eta1,f_eta2),
-												t,tx,ty
+function eval_fields(fields,
+										 (f_eta0,f_eta1,f_eta2),
+										 t,tx,ty=0
 												)
-
 	eta0 = f_eta0(t)
 
 	eta1 = f_eta1(t)
 
 	eta2 = f_eta2(t)
 		
-	eta3 = numerical_derivative(f_eta2, t, 1e-4)
+	eta3 = utils.numerical_derivative(f_eta2, t, 1e-4)
 	
 	txy = [tx,ty]
 
-	return ((eta0,eta1,eta2,eta3),
-					chain_rule_outer(eta1, txy),
+	D = chain_rule_outer(eta1, txy)
+
+	data = ((eta0,eta1,eta2,eta3),
+					D,
 					txy)
 
+	return [eta0,conj(eta0),D,conj(D)], data 
+
+#	return get_field(data, argmax(length, fields)), data 
+
 end 
+
+
+function get_field(fields,
+										 (f_eta0,f_eta1,f_eta2),
+										 t::Real,tx::Real,ty::Real=0
+												)
+
+	eta0 = f_eta0(t)
+	
+	D = chain_rule_outer(f_eta1(t), [tx,ty])
+
+	return [eta0,conj(eta0),D,conj(D)] 
+
+end 
+
+
 
 
 
@@ -353,7 +559,7 @@ function get_Data(P::UODict)
 					 Hamiltonian.eta_interp_deriv(P),
 					 Hamiltonian.eta_interp_deriv2(P)
 					 ),
-					(fields_symb, (F, dF, d2F))
+					fields_symb, (F, dF, d2F)
 					)
 
 end  
@@ -388,243 +594,217 @@ end
 #---------------------------------------------------------------------------#
 
 
-function eval_free_en(N::Int, 
-													field_data,
-													(fields1,fields2)::Tuple{NTuple{2,Symbol},
-																									 NTuple{4,Symbol},
-																									 },
-													tensors
-													)::Float64 
 
-	field_vals = get_field(field_data, fields2)
+function eval_free_en((etas, fields, tensors), t::Vararg{<:Real})::Float64
 
-	utils.ignore_zero_imag(get_functional(tensors)(field_vals...))
+	#eval_free_en(tensors, eval_fields(fields, etas,  t...)...)
+
+	field_vals = get_field(fields, etas, t...)
+
+#@time 	field_vals1, = eval_fields(fields, etas,  t...)
+
+#for (a,b) in zip(field_vals,field_vals1)
+#@assert a≈b
+#end 
+
+#function eval_free_en(
+#											tensors,
+#											field_vals::AbstractVector{<:AbstractArray},
+#											args...
+#											)::Float64  
+
+out = utils.ignore_zero_imag(get_functional(tensors)(field_vals...))
+#println()
+return out 
+end  
+
+
+
+function eval_free_en_deriv1(
+									 (etas, fields, tensors), 
+									 T::Vararg{<:Real,N})::Vector{Float64} where N
+
+	eval_free_en_deriv1(N, fields[1], tensors, 
+											eval_fields(fields, etas,  T...)...)
 
 end  
 
 
-function eval_free_en_deriv1(N::Int, 
-													field_data,
-													(fields1,fields2)::Tuple{NTuple{2,Symbol},
-																									 NTuple{4,Symbol},
-																									 },
-													tensors
-													)::Tuple
+function eval_free_en_deriv1!(f1::AbstractVector{Float64},
+									 (etas, fields, tensors), 
+									 T::Vararg{<:Real})::Nothing 
 
-	field_vals = get_field(field_data, fields2) 
+	eval_free_en_deriv1!(f1, fields[1], tensors, 
+											eval_fields(fields, etas,  T...)...)
+
+end  
+
+function eval_free_en_deriv1(N::Int,
+														 args...)::Vector{Float64}
 
 	f1 = zeros(Float64, N)
 
-	for (i_psi,psi) in enumerate(fields1)
-
-		for ((I,),S) in get_functional(tensors,i_psi)
-
-			s = S(field_vals...)
-			
-			for k = 1:N
-
-				f1[k] += 2real(s*get_field(field_data, psi, I, k)) 
-
-			end 
-
-		end 
-
-	end 
+	eval_free_en_deriv1!(view(f1,:), args...)
 
 	return f1 
 
 end 
 
-function eval_free_en_deriv2(N::Int, 
+
+
+function eval_free_en_deriv1!(f1::AbstractVector{Float64},
+													fields::NTuple{2,Symbol},
+													tensors,
+													field_vals::AbstractVector{<:AbstractArray},
 													field_data,
-													(fields1,fields2)::Tuple{NTuple{2,Symbol},
-																									 NTuple{4,Symbol},
-																									 },
-													tensors
-													)::Tuple
-
-	field_vals = get_field(field_data, fields2) 
-
-	f2 = zeros(ComplexF64, N, N)
-
-	for (i_psi,psi) in enumerate(fields1)
-
-		for ((I,),S) in get_functional(tensors,i_psi)
-
-			s = S(field_vals...)
-			
-			for k = 1:N,n=1:N 
-
-				f2[k,n] += s*get_field(field_data, psi, I, k, n)
-
-			end 
-
-		end 
-
-
-		for (i_phi,phi) in enumerate(fields2)
-			
-			for ((I,J),S) in get_functional(tensors, i_psi, i_phi)
-
-				s = S(field_vals...)
-				
-				for n=1:N, k=1:N
-	
-					f2[k,n] += *(s,
-											 get_field(field_data, psi, I, k),
-											 get_field(field_data, phi, J, n)
-											 )
-				end 
-		
-			end 
-
-		end 
-
-	end 
-
-	return 2real(f2)
-
-end 
-
-
-
-
-
-
-
-function eval_derivatives(N::Int, 
-													field_data,
-													(fields1,fields2)::Tuple{NTuple{2,Symbol},
-																									 NTuple{4,Symbol},
-																									 },
-													tensors
-													)::Tuple
-
-
-
-	f0::Float64 = utils.ignore_zero_imag(get_functional(tensors)(field_vals...))
-
-	f1 = zeros(Float64, N)
-
-	f2 = zeros(ComplexF64, N, N)
-
-
-
-	for (i_psi,psi) in enumerate(fields1)
-
-		for ((I,),S) in get_functional(tensors,i_psi)
-
-			s = S(field_vals...)
-			
-			for k = 1:N
-
-				f1[k] += 2real(s*get_field(field_data, psi, I, k))
-
-				for n = 1:N
-
-					f2[k,n] += s*get_field(field_data, psi, I, k, n)
-
-				end 
-
-			end 
-
-		end 
-
-
-		for (i_phi,phi) in enumerate(fields2)
-			
-			for ((I,J),S) in get_functional(tensors, i_psi, i_phi)
-
-				s = S(field_vals...)
-				
-				for n=1:N, k=1:N
-	
-					f2[k,n] += *(s,
-											 get_field(field_data, psi, I, k),
-											 get_field(field_data, phi, J, n)
-											 )
-				end 
-		
-			end 
-
-		end 
-
-	end 
-
-	@show f0≈eval_free_en(N, field_data, (fields1, fields2), tensors)
-	
-	@show f1≈eval_free_en_deriv1(N, field_data, (fields1, fields2), tensors)
-	
-	@show 2real(f2)≈eval_free_en_deriv2(N, field_data, (fields1, fields2), tensors)
-
-	return (f0, f1, 2real(f2)) 
-
- 
-end 
-
-function eval_derivatives(N::Int, 
-													data,
-													(fields,)::NTuple{2,NTuple{4,Symbol}},
-													tensors
-													)::Tuple
-
-
-	field_vals = get_field(data, fields)
-
-	f0 = get_functional(tensors)(field_vals...)
-
-	f1 = zeros(ComplexF64, N)
-
-	f2 = zeros(ComplexF64, N, N)
-
+													)::Nothing
 
 	for (i_psi,psi) in enumerate(fields)
 
-		for ((I,),S) in get_functional(tensors, i_psi)
+		for ((I,),S) in get_functional(tensors,i_psi)
 
-			s = S(field_vals...)
+			s::ComplexF64 = S(field_vals...)::ComplexF64
 			
-			for k = 1:N
+			for k=1:length(f1)
 
-				f1[k] += s*get_field(data, psi, I, k)
+				p::ComplexF64 = get_field(field_data, psi, I, k)::ComplexF64
 
-				for n = 1:N
-
-					f2[k,n] += s*get_field(data, psi, I, k, n)
-
-				end 
+				f1[k] += 2real(p*s)
 
 			end 
 
-		end 
-
-
-		for (j_phi,phi) in enumerate(fields)
-			
-			for ((I,J),S) in get_functional(tensors, i_psi, j_phi) 
-
-				s = S(field_vals...)
-				
-				for n=1:N,k=1:N
-					
-					f2[k,n] += *(s,
-											 get_field(data, psi, I, k),
-											 get_field(data, phi, J, n)
-											 )
-	
-				end 
-
-			end 
-	
 		end 
 
 	end 
 
-	return (utils.ignore_zero_imag(f0),
-					utils.ignore_zero_imag.(f1),
-					utils.ignore_zero_imag.(f2))
+	return #f1 
 
 end 
+ 
+
+
+function eval_free_en_deriv2!(
+															A::AbstractMatrix{ComplexF64},
+									 (etas, fields, tensors), 
+									 T::Vararg{<:Real})::Nothing 
+
+	eval_free_en_deriv2!(A,
+											 fields, tensors, 
+											 eval_fields(fields, etas,  T...)...)
+
+end  
+
+
+function eval_free_en_deriv2(
+									 (etas, fields, tensors), 
+									 T::Vararg{<:Real,N})::Matrix{Float64} where N
+
+	f2 = zeros(ComplexF64,N,N)
+
+	eval_free_en_deriv2!(f2,
+											 fields, tensors, 
+											 eval_fields(fields, etas,  T...)...) 
+
+	return real(f2)
+
+end   
+
+
+
+
+function eval_free_en_deriv2!(f2::AbstractMatrix{ComplexF64},
+													(fields1,fields2)::Tuple{NTuple{2,Symbol},
+																									 NTuple{4,Symbol}},
+													tensors,
+													field_vals::AbstractVector{<:AbstractArray},
+													field_data,
+													)::Nothing 
+#
+#function eval_free_en_deriv2(
+#													(fields1,fields2)::Tuple{NTuple{2,Symbol},
+#																									 NTuple{4,Symbol}},
+#													tensors,
+#													field_vals::AbstractVector{<:AbstractArray},
+#													field_data,
+#													N::Int,
+#													)::Matrix{Float64}
+
+
+
+	for (i_psi,psi) in enumerate(fields1)
+
+		for ((I,),S) in get_functional(tensors,i_psi)
+
+			s::ComplexF64 = S(field_vals...)::ComplexF64
+			
+			for n=axes(f2,2), k=axes(f2,1)
+
+				p::ComplexF64 = get_field(field_data, psi, I, k, n)::ComplexF64 
+
+				f2[k,n] += s*p
+
+			end 
+
+		end 
+
+	#end 
+
+
+
+	#for (i_psi,psi) in enumerate(fields1)
+
+		for (i_phi,phi) in enumerate(fields2)
+			
+			for ((I,J),S) in get_functional(tensors, i_psi, i_phi)
+
+				s::ComplexF64 = S(field_vals...)::Union{Float64,ComplexF64}
+			
+				for n=axes(f2,2), k=axes(f2,1)
+	
+					f2[k,n] += *(s,
+											 get_field(field_data, psi, I, k)::ComplexF64,
+											 get_field(field_data, phi, J, n)::ComplexF64
+											 )
+				end 
+		
+			end 
+
+		end 
+
+	end 
+
+	f2 += conj(f2) 
+
+	return 
+
+end 
+
+
+
+
+
+
+
+#	for (i_psi,psi) in enumerate(fields1)
+#
+#		for ((I,),S) in get_functional(tensors,i_psi)
+#
+#			s = S(field_vals...)
+#			
+#			for k = 1:N
+#
+#				f1[k] += 2real(s*get_field(field_data, psi, I, k))
+#
+#				for n = 1:N
+#
+#					f2[k,n] += s*get_field(field_data, psi, I, k, n)
+#
+#				end 
+#
+#			end 
+#
+#		end 
+#
 
 
 	
@@ -648,16 +828,6 @@ end
 
 
 
-
-function iterate_GL_terms(coeffs::AbstractVector{<:Real},
-													indsets::AbstractVector{<:Tuple{<:Real,<:AbstractVector}}
-													)::Base.Iterators.Flatten
-
-	@assert length(coeffs) == length(indsets)
-
-	((c1*c2,comb) for (c1,(c2,combs)) in zip(coeffs,indsets) for comb in combs)
-	
-end 
 
 
 
@@ -1063,175 +1233,6 @@ end
 
 
 
-function BCS_coherence_length(Delta0::Real)::Float64
-
-	0.7/Delta0
-
-end  
-
-function eta_magnitude_squared(Delta0::Real)::Float64 
-
-	2*Delta0^2
-
-end 
-
-function get_K_ampl(Delta0::Real,b::Real=1)::Float64 
-
-	2b*eta_magnitude_squared(Delta0)*BCS_coherence_length(Delta0) 
-
-end 
-
-function get_coeff_a(Delta0::Real,b::Real=1)::Vector{Float64}
-
-	[-eta_magnitude_squared(Delta0)*b]
-
-end 
-
-
-function covariant_derivative(etaJacobian::T
-															)::T where T<:AbstractMatrix{<:Number}
-	etaJacobian 
-
-end  
-
-
-function covariant_derivative(
-															etaJacobian::AbstractMatrix{<:Number},
-															eta::AbstractVector{<:Number},
-															A::AbstractVector{<:Number},
-															gamma::Real,
-															)::Matrix{ComplexF64}
-
-	@assert size(etaJacobian)==(3,2)
-
-	etaJacobian + im*gamma*A*transpose(eta)
-
-end 
-
-
-function covariant_derivative_deriv_eta(
-															etaJacobian::AbstractMatrix{<:Number},
-															eta::AbstractVector{<:Number},
-															A::AbstractVector{<:Number},
-															gamma::Real,
-															)::NTuple{2,Matrix{ComplexF64}}
-
-	@assert size(etaJacobian)==(3,2)
-
-	(A*[im*gamma 0], A*[0 im*gamma])
-
-end 
-
-
-function covariant_derivative_deriv_A(
-															etaJacobian::AbstractMatrix{<:Number},
-															eta::AbstractVector{<:Number},
-															A::AbstractVector{<:Number},
-															gamma::Real,
-															)::NTuple{3,Matrix{ComplexF64}}
-
-	@assert size(etaJacobian)==(3,2)
-
-	([im*gamma 0 0]*transpose(eta), 
-	 [0 im*gamma 0]*transpose(eta), 
-	 [0 0 im*gamma]*transpose(eta)
-	 )
-
-end 
-
-
-
-
-
-function chain_rule_outer(dF_df::AbstractVector{T1},
-										df_dx::AbstractVector{T2}
-										)::Matrix{promote_type(T1,T2)} where {T1<:Number,T2<:Number}
-
-	df_dx * transpose(dF_df)
-
-end 
-
-
-
-
-
-function chain_rule_inner(dF_df::AbstractVector{T1},
-										df_dx::AbstractVector{T2}
-										)::promote_type(T1,T2) where {T1<:Number,T2<:Number}
-
-	mapreduce(*,+,dF_df,df_dx;init=0.0)
-
-end 
-
-function chain_rule_inner(dF_df::AbstractMatrix{T1},
-										df_dx::AbstractVecOrMat{T2}
-										)::Array{promote_type(T1,T2),N} where {T1<:Number,T2<:Number,N}
-
-	dF_df*df_dx
-
-end 
-
-function chain_rule_inner(A::AbstractVecOrMat,B::AbstractVecOrMat,
-													a::AbstractVecOrMat,b::AbstractVecOrMat
-													)
-	chain_rule_inner(A,a) + chain_rule_inner(B,b)
-																	
-end  
-
-
-
-chain_rule_inner(t::Tuple) = chain_rule_inner(t...)
-chain_rule_inner(t1::Tuple,t2::Tuple) = chain_rule_inner(t1...,t2...)
-
-
-
-	
-
-
-
-
-
-
-function curl(Jacobian::AbstractMatrix{T})::Vector{T} where T<:Number 
-
-	@assert LinearAlgebra.checksquare(Jacobian)==3 
-
-	C = zeros(T,3)
-
-	for (i,j,k) in Combinatorics.permutations(1:3)
-
-		C[i] += Combinatorics.levicivita_lut[i,j,k]*Jacobian[j,k]
-
-	end 
-
-	return C
-
-end 
-
-																		
-
-
-
-function bs_from_anisotropy(nu::Real,b::Real=1)::Vector{Float64}
-
-	[(3+nu)/8, (1-nu)/4, - (3nu+1)/4]*b
-
-end 
-
-function Ks_from_anisotropy(nu::Real,K::Real)::Vector{Float64}
-
-	vcat(3+nu, fill(1-nu,3), 0)*K/4 
-	
-end 
-
-function get_coeffs_Ks(nu::Real,Delta0::Real,b::Real=1)::Vector{Float64}
-
-	Ks_from_anisotropy(nu,get_K_ampl(Delta0,b))
-
-end  
-
-
-
 
 #function eta_path_length_1D(dev_params::UODict)::Vector{Float64}
 #
@@ -1272,227 +1273,106 @@ end
 
 
 
-function dAdg(M::AbstractMatrix{Tm},
-							X::AbstractMatrix{Tx},
-							Y::AbstractMatrix{Ty},
-							h::Float64,s::Float64
-							) where {Tm<:Number,Tx<:Number,Ty<:Number}
 
-	n,m = size(M)
+function eval_deriv1_on_mvd!(A::AbstractArray{Float64,N1},
+														 data, mvd::AbstractArray{Float64,N1}, 
+														 steps::Vararg{Real,N}
+														 )::Nothing where {N,N1}
 
-	D = zeros(promote_type(Tm,Tx,Ty), n+1,m+1)
-	
+	@assert N1==N+1 && N in 1:2
 
-	for j=1:m,i=1:n 
+	A .= 0.0
 
-		D[i,j] += M[i,j] - X[i,j] - Y[i,j]
+	CentralDiff.eval_fct_on_mvd!(A, data, eval_free_en_deriv1!, mvd, 
+																	(N+1,), steps...)
 
-		D[i+1,j] += M[i,j] + X[i,j] - Y[i,j] 
-
-		D[i,j+1] += M[i,j] - X[i,j] + Y[i,j] 
-
-		D[i+1,j+1] += M[i,j] + X[i,j] + Y[i,j] 
+	for (a,w) in zip(CentralDiff.mvd_container(A), 
+									 CentralDiff.central_diff_w(steps...))
+		a .*= w
 
 	end 
 
-	D .*= s*h 
+	return  
 
-	return D 
-
-end 
-
-
-
-function dAdg(MXY::AbstractArray{T,3}, h::Float64, s::Float64
-							)::Matrix{promote_type(T,Float64)} where T<:Number 
-
-	n,m, = size(MXY)
-
-	P,W = central_diff_PW2(h,s)
-
-	D = zeros(promote_type(T,Float64), n+1, m+1) 
-
-	for k=1:3, j=1:m, i=1:n, l=1:4
-
-		D[i+P[1,l],j+P[2,l]] += W[l,k]*MXY[i,j,k]
-	
-	end 
-
-	return D 
-
-end 
+end  
 
 
 
 
-function M_X_Y(midg::AbstractMatrix{Tm},
-							 dgdx::AbstractMatrix{Tx},
-							 dgdy::AbstractMatrix{Ty},
-							 h::Real, s::Real,
-							 data
-							 )::Array{promote_type(T,Float64),3
-												} where {T<:Number,Tm<:T,Tx<:T,Ty<:T}
+function eval_deriv1_on_mvd(data, mvd::AbstractArray{Float64,N1}, 
+														steps::Vararg{Real,N}
+														)::Array{Float64,N+1} where {N,N1}
 
-	n,m = size(midg)
+	@assert N1==N+1 && N in 1:2
 
-	w = central_diff_w(h,s)
+	A = CentralDiff.eval_fct_on_mvd(data, eval_free_en_deriv1, mvd, 
+																	(N+1,), steps...)
 
-	MXY = ones(promote_type(T,Float64), n, m) .* reshape(w, 1,1,:)
+	for (a,w) in zip(CentralDiff.mvd_container(A), 
+									 CentralDiff.central_diff_w(steps...))
 
-
-	for j=1:m,i=1:n
-
-		f,df,d2f = g04(data, midg[i,j], dgdx[i,j], dgdy[i,j])
-
-		MXY[i,j,:] .*= df 
+		a .*= w
 
 	end 
-	
-	return MXY 
 
-end 
+	return A 
 
-
+end  
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
+function eval_deriv2_on_mvd!(A::AbstractArray{ComplexF64,N2},
+														 data, mvd::AbstractArray{Float64,N1},
+														 steps::Vararg{Real,N}
+														 )::Nothing where {N,N1,N2}
 
-function M_X_Y(mxy::AbstractArray{T,3},
-							 h::Real, s::Real,
-							 data
-							 )::Array{promote_type(T,Float64),3} where T<:Number
+	@assert N1==N+1 && N2==N+2 && N in 1:2 
 
-	n,m = size(mxy)[2:3]
+	A .= 0.0
 
-	w = central_diff_w(h,s)
+	w = CentralDiff.central_diff_w(steps...)  
 
-	MXY = ones(promote_type(T,Float64), n, m) .* reshape(w, 1,1,:)
+	CentralDiff.eval_fct_on_mvd!(A, data, eval_free_en_deriv2!, mvd, 
+																	(N+1,N+1), steps...)
 
-
-	for j=1:m,i=1:n
-
-		f,df,d2f = g04(data, mxy[1,i,j], mxy[2,i,j], mxy[3,i,j]) 
-
-		MXY[i,j,:] .*= df 
-
-
-
-	end 
-	
-	return MXY 
-
-end 
-
-
-function M_X_Y_2(midg::AbstractMatrix{Tm},
-							 dgdx::AbstractMatrix{Tx},
-							 dgdy::AbstractMatrix{Ty},
-							 h::Real, s::Real,
-							 data
-							 )::Array{promote_type(T,Float64),4
-												} where {T<:Number,Tm<:T,Tx<:T,Ty<:T}
-
-
-	n,m = size(midg)
-
-	w = central_diff_w(h,s)
-
-	MXY2 = reshape(w'.*w,3,3,1,1) .* ones(promote_type(T,Float64),1,1,n,m)
-
-	for j=1:m,i=1:n 
+	for j=1:N+1
 		
-		F,dF,d2F = g04(data, midg[i,j], dgdx[i,j], dgdy[i,j])
-
-		MXY2[:,:,i,j] .*= d2F 
-
-	end 
-
-	return MXY2
-
-end 
-
-function M_X_Y_2(mxy::AbstractArray{T,3},
-							 h::Real, s::Real,
-							 data
-							 )::Array{promote_type(T,Float64),4
-												} where T
-
-
-	n,m = size(mxy)[2:3]
-
-	w = central_diff_w(h,s)
-
-	MXY2 = reshape(w'.*w,3,3,1,1) .* ones(promote_type(T,Float64),1,1,n,m)
-
-	for j=1:m,i=1:n 
-		
-		f,df,d2f = g04(data, mxy[1,i,j], mxy[2,i,j], mxy[3,i,j]) 
-
-		MXY2[:,:,i,j] .*= d2f
+		A[:,j,:,:] .*= w[j] 
+	
+		A[j,:,:,:] .*= w[j]
 
 	end 
 
-	return MXY2
+	return  
 
-end 
-
-
+end  
 
 
 
 
 
-
-
-
-#function xyz_neighb(g::AbstractArray{T,N}
-#											 I::NTuple{N,Int},
-#											 P::AbstractMatrix{Int},
-#											 k::Int)::T where {T<:Number,N}
-#											
-#	g[xyz_neighb(I, p, k)...]
-#
-#end 
-
-
-
-
-
-
-
-function m_dx_dy(g::AbstractMatrix{T},h::Real,s::Real
-								 )::NTuple{3,Matrix} where T<:Number
-
-	out = central_diff_fun_and_deriv(g, h, s)
-
-	return ntuple(i->selectdim(out, 1, i),3)
-
-#	n,m = size(g) .-1
+#===========================================================================#
 #
 #
-##	M = zeros(promote_type(T,Float64), n, m)
-##	X = zeros(promote_type(T,Float64), n, m)
-##	Y = zeros(promote_type(T,Float64), n, m)
-#	
-#	M = fill(promote_type(T,Float64)(0.25), n, m)
 #
-#	X = fill(promote_type(T,Float64)(0.5/h), n, m)
+#---------------------------------------------------------------------------#
+
+
+
+
+
+
+#===========================================================================#
 #
-#	Y = fill(promote_type(T,Float64)(0.5/s), n, m)
-#	
 #
-#	for j=1:m, i=1:n
 #
-#		M[i,j] *=  g[i,j] + g[i+1,j] + g[i,j+1] + g[i+1,j+1]
-#		X[i,j] *= -g[i,j] + g[i+1,j] - g[i,j+1] + g[i+1,j+1]
-#		Y[i,j] *= -g[i,j] - g[i+1,j] + g[i,j+1] + g[i+1,j+1]
-#
-#	end 
-#	
-#	return M,X,Y
-
-end 
+#---------------------------------------------------------------------------#
 
 
 
@@ -1508,15 +1388,6 @@ end
 
 
 
-
-
-function g04((etas, tensors), T::Vararg{<:Real,N}) where N
-
-	field_data = eval_fields(etas, T...)
-
-	return eval_derivatives(N, field_data, tensors...)
-
-end 
 
 function dAdg_(midg::AbstractMatrix{Tm},
 							dgdx::AbstractMatrix{Tx},
@@ -1531,7 +1402,7 @@ function dAdg_(midg::AbstractMatrix{Tm},
 
 	T = promote_type(Tm,Tx,Ty,Float64)
 
-	P,W = central_diff_PW1(h,s)
+	P,W = CentralDiff.central_diff_PW1(h,s)
 
 
 	A::Float64 = 0.0
@@ -1566,8 +1437,9 @@ function dAdg_(midg::AbstractMatrix{Tm},
 
 
 
-
-		F,dF,d2F = g04(data, midg[ij...], dgdx[ij...], dgdy[ij...]) 
+		F = eval_free_en(data, midg[ij...], dgdx[ij...], dgdy[ij...]) 
+		dF = eval_free_en_deriv1(data, midg[ij...], dgdx[ij...], dgdy[ij...]) 
+		d2F = eval_free_en_deriv2(data, midg[ij...], dgdx[ij...], dgdy[ij...]) 
 
 
 		if k==1
@@ -1626,52 +1498,35 @@ end
 
 
 function d2Adg2_(MXY2::AbstractArray{T,4},
-											h::Float64, s::Float64
+								 steps::Vararg{Real,N}
 											)::Matrix{promote_type(T,Float64)} where {T<:Number}
 
-	n,m = size(MXY2)[3:4]
+	Li = LinearIndices(size(MXY2)[N+1:end].+1)
 
-	P,S = central_diff_PS(h,s)
+	A = zeros(promote_type(T,Float64), length(Li), length(Li))
 
-	w= central_diff_w(h,s)
+	dv = CentralDiff.volume_element(steps...)
 
-	L = (n+1)*(m+1) 
+	@simd for I=CartesianIndices(axes(MXY2)[N+1:end])
+		@simd for j=1:N+1
+			@simd for i=1:N+1
+				@simd for k=1:2^N
+					@simd for q=1:2^N
 
-
-	d2A = zeros(promote_type(T,Float64),L,L)
-	
-	Li = LinearIndices((1:n+1,1:m+1))
-
-
-	QWE = Vector{Int}(undef,4)
-
-	aa = Matrix{promote_type(T,Float64)}(undef,4,4) 
-
-
-	for j=1:m,i=1:n 
-		
-		aa .= h*s*S*MXY2[:,:,i,j]*S'
-
-		for k in 1:4
-
-#			dA[QWE[k]] = h*s*LinearAlgebra.dot(selectdim(W, 1, k), dF) 
-
-			QWE[k] = Li[i+P[1,k], j+P[2,k]]
-
-			d2A[QWE[k],QWE[k]] += aa[k,k]  
-
-			for q=1:k-1 
-
-				d2A[QWE[k],QWE[q]] += aa[k,q]
-				d2A[QWE[q],QWE[k]] += aa[k,q]
-
+						A[Li[I + CentralDiff.CD_P[N][q]],
+							Li[I + CentralDiff.CD_P[N][k]]
+							] += *(dv,
+										 CentralDiff.CD_S[N][q,i],
+										 MXY2[i,j,I],
+										 CentralDiff.CD_S[N][k,j]
+										 )
+					end 
+				end 
 			end 
-
 		end 
-
 	end 
 
-	return d2A 
+	return A
 
 end 
 
@@ -1682,6 +1537,222 @@ end
 
 
 
+#===========================================================================#
+#
+# Obsolete functions 
+#
+#---------------------------------------------------------------------------#
+
+function M_X_Y_2(midg::AbstractMatrix{Tm},
+							 dgdx::AbstractMatrix{Tx},
+							 dgdy::AbstractMatrix{Ty},
+							 h::Real, s::Real,
+							 data
+							 )::Array{promote_type(T,Float64),4
+												} where {T<:Number,Tm<:T,Tx<:T,Ty<:T}
+
+	warn()
+	n,m = size(midg)
+
+	w = CentralDiff.central_diff_w(h,s)
+
+	MXY2 = reshape(w'.*w,3,3,1,1) .* ones(promote_type(T,Float64),1,1,n,m)
+
+	for j=1:m,i=1:n 
+		
+		MXY2[:,:,i,j] .*= eval_free_en_deriv2(data, midg[i,j], dgdx[i,j], dgdy[i,j])
+
+	end 
+
+	return MXY2
+
+end 
+
+function M_X_Y_2(mxy::AbstractArray{T,3},
+							 h::Real, s::Real,
+							 data
+							 )::Array{promote_type(T,Float64),4
+												} where T
+	warn()
+
+	n,m = size(mxy)[2:3]
+
+	w = CentralDiff.central_diff_w(h,s)
+
+	MXY2 = reshape(w'.*w,3,3,1,1) .* ones(promote_type(T,Float64),1,1,n,m)
+
+	for j=1:m,i=1:n 
+	
+
+		MXY2[:,:,i,j] .*= eval_free_en_deriv2(data, mxy[1,i,j], mxy[2,i,j], mxy[3,i,j]) 
+
+	end 
+
+	return MXY2
+
+end 
+
+
+
+
+
+
+
+
+
+
+#function xyz_neighb(g::AbstractArray{T,N}
+#											 I::NTuple{N,Int},
+#											 P::AbstractMatrix{Int},
+#											 k::Int)::T where {T<:Number,N}
+#											
+#	g[xyz_neighb(I, p, k)...]
+#
+#end 
+
+
+
+
+
+
+
+
+
+function dAdg(MXY::AbstractArray{T,3}, h::Float64, s::Float64
+							)::Matrix{promote_type(T,Float64)} where T<:Number 
+
+	warn() 
+
+	n,m, = size(MXY)
+
+	P,W = CentralDiff.central_diff_PW2(h,s)
+
+	D = zeros(promote_type(T,Float64), n+1, m+1) 
+
+	for k=1:3, j=1:m, i=1:n, l=1:4
+
+		D[i+P[1,l],j+P[2,l]] += W[l,k]*MXY[i,j,k]
+	
+	end 
+
+	return D 
+
+end 
+
+
+function dAdg(M::AbstractMatrix{Tm},
+							X::AbstractMatrix{Tx},
+							Y::AbstractMatrix{Ty},
+							h::Float64,s::Float64
+							) where {Tm<:Number,Tx<:Number,Ty<:Number}
+
+	warn() 
+
+	n,m = size(M)
+
+	D = zeros(promote_type(Tm,Tx,Ty), n+1,m+1)
+	
+
+	for j=1:m,i=1:n 
+
+		D[i,j] += M[i,j] - X[i,j] - Y[i,j]
+
+		D[i+1,j] += M[i,j] + X[i,j] - Y[i,j] 
+
+		D[i,j+1] += M[i,j] - X[i,j] + Y[i,j] 
+
+		D[i+1,j+1] += M[i,j] + X[i,j] + Y[i,j] 
+
+	end 
+
+	D .*= s*h 
+
+	return D 
+
+end 
+
+function M_X_Y(midg::AbstractMatrix{Tm},
+							 dgdx::AbstractMatrix{Tx},
+							 dgdy::AbstractMatrix{Ty},
+							 h::Real, s::Real,
+							 F::Function,
+							 data
+							 )::Array{promote_type(T,Float64),3
+												} where {T<:Number,Tm<:T,Tx<:T,Ty<:T}
+
+	warn() 
+	n,m = size(midg)
+
+	w = CentralDiff.central_diff_w(h,s)
+
+	MXY = ones(promote_type(T,Float64), n, m) .* reshape(w, 1,1,:)
+
+
+	for j=1:m,i=1:n
+
+		MXY[i,j,:] .*= F(data, midg[i,j], dgdx[i,j], dgdy[i,j])
+
+	end 
+	
+	return MXY 
+
+end 
+
+
+
+
+
+function M_X_Y(mxy::AbstractArray{T,3},
+							 h::Real, s::Real,
+							 F::Function,
+							 data
+							 )::Array{promote_type(T,Float64),3} where T<:Number
+
+	warn() 
+
+	n,m = size(mxy)[2:3]
+
+	w = CentralDiff.central_diff_w(h,s)
+
+	MXY = ones(promote_type(T,Float64), n, m) .* reshape(w, 1,1,:)
+
+
+	for j=1:m,i=1:n
+
+		MXY[i,j,:] .*=F(data, mxy[1,i,j], mxy[2,i,j], mxy[3,i,j]) 
+
+	end 
+	
+	return MXY 
+
+end 
+
+
+function m_dx_dy(g::AbstractMatrix{T},h::Real,s::Real
+								 )::NTuple{3,Matrix} where T<:Number
+
+	warn()
+
+	n,m = size(g) .-1
+
+	
+	M = fill(promote_type(T,Float64)(0.25), n, m)
+
+	X = fill(promote_type(T,Float64)(0.5/h), n, m)
+
+	Y = fill(promote_type(T,Float64)(0.5/s), n, m)
+	
+	for j=1:m, i=1:n
+
+		M[i,j] *=  g[i,j] + g[i+1,j] + g[i,j+1] + g[i+1,j+1]
+		X[i,j] *= -g[i,j] + g[i+1,j] - g[i,j+1] + g[i+1,j+1]
+		Y[i,j] *= -g[i,j] - g[i+1,j] + g[i,j+1] + g[i+1,j+1]
+
+	end 
+	
+	return M,X,Y
+
+end 
 
 
 
