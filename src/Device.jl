@@ -30,7 +30,14 @@ export Hamiltonian
 
 
 include("Hamilt_Diagonaliz.jl") 
-include("GinzburgLandau.jl")
+
+include("utils.jl") 
+include("Taylor.jl") 
+
+include("GinzburgLandau_draft.jl")
+
+#include("CentralDiff.jl")
+#include("GinzburgLandau.jl")
 
 include("GreensFcts.jl")
 
