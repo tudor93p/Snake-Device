@@ -13,7 +13,7 @@ import LinearAlgebra
 
 ignore_zero_imag(x::Real)::Real = x
 
-ignore_zero_imag(x::ComplexF64)::Real = abs(imag(x))<1e-12 ? real(x) : error() 
+ignore_zero_imag(x::ComplexF64)::Real = abs(imag(x))<1e-12 ? real(x) : error(string(imag(x)))
 
 
 #===========================================================================#
@@ -182,6 +182,20 @@ function numerical_derivative(f, x, args...
 
 end 
 
+function numerical_derivative_(f,
+															x::Union{Number,AbstractArray{<:Number}},
+															dx::Float64,
+															i1::Int, inds::Vararg{Int}
+															)::Union{Number,AbstractArray{<:Number}}
+
+	fstep(s) = setindex!(zero(x),s,i1, inds...) 
+
+	return numerical_derivative_(f,x,dx,fstep)
+
+end 
+
+
+
 
 
 function numerical_derivative_(f,
@@ -207,7 +221,7 @@ end
 
 
 
-function test_derivative(f, f_truth, x, fstep=identity
+function test_derivative(f, f_truth, x, fstep...
 												)::Bool
 
 
@@ -223,7 +237,7 @@ function test_derivative(f, f_truth, x, fstep=identity
 
 	orders = map(Utils.logspace(1e-2,1e-9,20)) do dx 
 
-		a = numerical_derivative(f, x, dx, fstep)
+		a = numerical_derivative(f, x, dx, fstep...)
 
 		return -log10.([dx, LinearAlgebra.norm(truth - a)]) 
 
@@ -235,7 +249,7 @@ function test_derivative(f, f_truth, x, fstep=identity
 
 		ord0,ord = ords 
 
-		if ord < ord0/2 && ord < 3
+		if ord < ord0/2 #&& ord < 3
 			
 			for item in orders 
 		

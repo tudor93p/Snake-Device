@@ -947,7 +947,7 @@ Index(I::Index)::Index = I
 Index(i::Int)::Index{1} = Index(tuple(i))
 Index(v::AbstractVector{Int})::Index = Index(Tuple(v))
 
-
+Index(I::CartesianIndex)::Index = Index(Tuple(I))
 
 
 

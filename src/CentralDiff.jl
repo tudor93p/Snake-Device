@@ -1,7 +1,7 @@
 module CentralDiff 
 #############################################################################
 
-
+import LinearAlgebra
 
 
 
@@ -105,32 +105,114 @@ end
 #---------------------------------------------------------------------------#
 
 
-function collect_midval_deriv(A::AbstractArray{T,N1}, 
+function collect_midval_deriv_1D(
+													A::AbstractArray{T,N1}, 
 													steps::Vararg{Real,N}
 													)::Array{promote_type(T,Float64),N
 																	 } where {T<:Number,N,N1}
 
-	@assert N1==N+1 && N in 1:2 
+	@assert N in 1:2 && N1==N+1 
 
-	s = size(A)[2:N1] 
+	D = Array{promote_type(T,Float64), N}(undef, (size(A)[2:N1].+1)...) 
 
-	D = zeros(promote_type(T,Float64), (s.+1)...)
+	collect_midval_deriv_1D!(D, A, steps...)
 
-	@simd for xyz=CartesianIndices(s) 
+	return D 
+
+end 
+
+function collect_midval_deriv_1D!(
+													D::AbstractArray{T,N},
+													A::AbstractArray{T,N1}, 
+													steps::Vararg{Real,N}
+													)::Nothing where {T<:Number,N,N1} 
+
+	@assert N in 1:2 && N1==N+1 
+
+	@assert size(D) == size(A)[2:N1] .+ 1
+
+	D .= T(0)
+
+	dv = volume_element(steps...) 
+
+	@simd for xyz=CartesianIndices(axes(A)[2:N1])
 		@simd	for a=1:N+1
 			@simd for ngh=1:2^N
 				
-				@inbounds D[xyz + CD_P[N][ngh]] += CD_S[N][ngh, a] * A[a, xyz]
+				@inbounds D[xyz + CD_P[N][ngh]] += CD_S[N][ngh, a] * A[a, xyz] * dv
 
 			end 
 		end 
 	end 
 
-	D .*= volume_element(steps...) 
-
-	return D  
+	return 
 
 end 
+
+function collect_midval_deriv_2D!(
+								D::AbstractMatrix{T},
+								A::AbstractArray{T,N2},
+								 steps::Vararg{Real,N}
+								 )::Nothing  where {T<:Number,N,N2}
+
+	@assert N in 1:2 && N2==N+2 
+	
+	s = size(A)[3:N2]  
+
+	Li = LinearIndices(s.+1) # trivial when N=1 
+
+	@assert LinearAlgebra.checksquare(D)==length(Li) 
+
+	D .= T(0)
+
+	dv = volume_element(steps...)
+
+	@simd for xyz=CartesianIndices(s)
+		@simd for a2=1:N+1
+			@simd for a1=1:N+1
+				@simd for ngh2=1:2^N
+					@simd for ngh1=1:2^N
+
+						@inbounds D[Li[xyz + CD_P[N][ngh1]], 
+												Li[xyz + CD_P[N][ngh2]] 
+												] += *(CD_S[N][ngh1, a1],
+															 CD_S[N][ngh2, a2],
+															 A[a1,a2, xyz],
+															 dv
+															 )
+					end 
+				end 
+			end 
+		end 
+	end 
+
+	return 
+
+end 
+
+function collect_midval_deriv_2D(A::AbstractArray{T,N2},
+								 steps::Vararg{Real,N}
+								 )::Matrix{promote_type(T,Float64)} where {T<:Number,N,N2}
+	
+	@assert N in 1:2 && N2==N+2 
+
+	
+	n = prod(size(A)[3:N2].+1)
+	
+	D = Matrix{promote_type(T,Float64)}(undef, n, n)
+
+	collect_midval_deriv_2D!(D, A, steps...)
+
+	return D
+
+end 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 
@@ -141,12 +223,29 @@ function midval_and_deriv(g::AbstractArray{T,N},
 													)::Array{promote_type(T,Float64),N+1
 																						 } where {T<:Number,N}
 	@assert N in 1:2 
+	
+	A = Array{promote_type(T,Float64), N+1}(undef, N+1, (size(g).-1)...)
+
+	midval_and_deriv!(A, g, steps...)
+
+	return A 
+
+end 
+
+function midval_and_deriv!(A::AbstractArray{T,N1},
+													 g::AbstractArray{T,N},
+													steps::Vararg{Real,N}
+													)::Nothing where {T<:Number,N,N1}
+
+	@assert N in 1:2 && N1==N+1 
 
 	w = central_diff_w(steps...) 
 
 	s = size(g) .- 1
 
-	A = zeros(promote_type(T,Float64), N+1, s...)
+	@assert size(A)==(N+1, s...)
+
+	A .= T(0)
 
 	@simd for xyz=CartesianIndices(s) 
 		@simd for a=1:N+1 
@@ -158,9 +257,11 @@ function midval_and_deriv(g::AbstractArray{T,N},
 		end 
 	end 
 	
-	return A 
+	return 
 
 end 
+
+
 
 
 
@@ -322,10 +423,12 @@ function eval_fct_on_mvd!(
 												)::Nothing  where {T1<:Number,T2<:Number,N,N1,M,MN}
 
 	@assert N+1==N1 && N in 1:2 && MN==M+N 
-	
+
+	out .= T1(0)
+
 	I0 = fill(Colon(),M)
 
-	for I in CartesianIndices(size(out)[M+1:MN])
+	for I in CartesianIndices(axes(out)[M+1:MN])
 
 		F!(view(out, I0..., I), data, mvd_container(A,I)...)
 
