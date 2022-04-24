@@ -1,6 +1,6 @@
 import myLibs: Utils 
 import Device
-import Device: GL ,Hamiltonian, CentralDiff,Taylor,utils
+import Device: GL ,Hamiltonian, CentralDiff,Taylor,utils,algebra 
 import PyPlot,LinearAlgebra
 using Constants: VECTOR_STORE_DIM, MAIN_DIM
 import QuadGK ,Random,Combinatorics
@@ -49,7 +49,6 @@ SCDW_shapes = [0,2,3,6]
 
 color=colors[1] 
 
-ialpha=1 
 alpha = 0.3
 
 #for (SCDW_shape,color) in zip(SCDW_shapes,colors[1:length(SCDW_shapes)])
@@ -73,42 +72,12 @@ SCpy_magnitude = 0.1);
 		#
 		
 		
-		
 
 
 
 
 
-function solve_system!(z::AbstractVector,
-											 J::AbstractMatrix,
-											a::AbstractVector)#::Vector{Float64}
 
-	D = LinearAlgebra.Diagonal(J) 
-
-
-	
-		z .= -LinearAlgebra.LowerTriangular(J)\(a+LinearAlgebra.triu(J,1)*z)
-
-#		z .= inv(D)*((D-J)*z - a) 
-
-
-#	z .= solve_system(J,a)
-
-
-
-end 
-
-
-function solve_system(J::AbstractMatrix,
-											a::AbstractVector)#::Vector{Float64}
-#J*z==-a
-
-	-LinearAlgebra.LowerTriangular(J)\a 
-
-
-	#-J\a 
-
-end 
 
 function aux532(etas, args...)
 
@@ -641,6 +610,9 @@ end
 end 
 
 
+
+
+
 @testset "iterations" begin 
 
 	for SCDW_shape in SCDW_shapes
@@ -697,117 +669,60 @@ end
 
 #			g = sin.(LinRange(BC...,nx))
 
-			mvd = CentralDiff.midval_and_deriv(g, h) 
+
+			function aux431!(out, data, MVD, mesh...)
+
+				for i=CartesianIndices(1:nx-1)
+
+					eta = GL.eval_fields(data[1][1:2], 
+															 CentralDiff.mvd_container(MVD, i)...
+															 )[1][1]
+
+					out[1:2,i] .= abs.(Hamiltonian.eta_xy_to_pm(eta))
+
+				end 
+
+			end 
+		
+
+
+			(success, (free_en, ys)) = GL.rNJ!(g, Data, 0.3, [h],
+																	 [(GL.eval_free_en_on_mvd!,1),
+																		 (aux431!, (2,nx-1))
+																		];
+																	 verbose=true)
+
+			@show success
+
+
+
+			println(round.(free_en,digits=5))
+
+
 			
-	
-			df = GL.eval_deriv1_on_mvd(Data, mvd, h)
-			d2f = GL.eval_deriv2_on_mvd(Data, mvd, h)
-	
-	
-			dA = CentralDiff.collect_midval_deriv_1D(df, h) 
-			d2A = CentralDiff.collect_midval_deriv_2D(d2f, h)
+			for (r,lw) in enumerate(LinRange(0.1,2.5,size(ys,3)))
 
-	
-			z = solve_system(d2A,dA) 
-			
-			nr_iter = 300
-
-
-			free_en = GL.eval_free_en_on_mvd(Data, mvd, h) 
-		
-			println("Free energy start: $free_en")
-
-			for r = 1:nr_iter
-
-#				r==2 && break 
-
-				if (r-1)%10==0 
-	
-					free_en = GL.eval_free_en_on_mvd(Data, mvd, h) 
-		
-#					println("Free energy: $free_en")
-		
-#					println("First derivatives: ",norm(dA))
-	
-#					println("Relative correction: ",norm(z)/norm(g))
-#					println() 
-		
-#					@show r   
-
-					y = zeros(4,nx-1)
-					
-					for i=1:nx-1 
-
-						eta = GL.eval_fields(Data[1][1:2], mvd[1,i], mvd[2,i])[1][1]
-
-						y[1:2,i] .= abs.(Hamiltonian.eta_xy_to_pm(eta))
-
-						
-						#y[3:4,i] .= abs.(Hamiltonian.eta_xy_to_pm(eta0(x[i])))
-
-
-					end 
-
-					lw = LinRange(0.1,2.5,nr_iter)[r]
 
 					#					PyPlot.plot(x,tanh.(g),label="r",c="k",lw=LinRange(0.1,1,nr_iter)[r])
 					#PyPlot.plot(x[1:nx-1],y[3,:],c="gray",lw=lw/2)
 					#PyPlot.plot(x[1:nx-1],y[4,:],c="gray",lw=lw/2) 
-					PyPlot.plot(x[1:nx-1],y[1,:],c="r",lw=lw)
-					PyPlot.plot(x[1:nx-1],y[2,:],c="b",lw=lw) 
 					
+				PyPlot.plot(x[1:nx-1],ys[1,:,r],c="r",lw=lw)
 
-										
-					PyPlot.gca().set_xlim(xlim)
-					
-					sleep(0.001)
+				PyPlot.plot(x[1:nx-1],ys[2,:,r],c="b",lw=lw) 
 
-
-
-				
-					norm(z)/norm(g)<1e-7 && break 
-#					norm(dA)<1e-6 && break 
-	
-				end 
-	
-				@simd for I in LinearIndices(g)
-	
-					g[I] += relaxation*real(z[I])
-	
-				end 
-
-	
-				CentralDiff.midval_and_deriv!(mvd, g, h) 
-	
-				GL.eval_deriv1_on_mvd!(df, Data, mvd, h)
-	
-				GL.eval_deriv2_on_mvd!(d2f, Data, mvd, h)
-	
-				CentralDiff.collect_midval_deriv_1D!(dA, df, h) 
-	
-				CentralDiff.collect_midval_deriv_2D!(d2A, d2f, h)
-
-				z .= 0 
-
-				try 
-					
-					solve_system!(z,d2A,dA) 
-
-				catch 
-
-					break 
-				end 
-
-	
 			end 
-			
-			free_en = GL.eval_free_en_on_mvd(Data, mvd, h) 
-		
-			println("Free energy finish: $free_en\n")
-			
-			free_en = GL.eval_free_en_on_mvd(Data, mvd, h) 
 
-			sleep(0.1)	
+			PyPlot.gca().set_xlim(xlim)
+					
+
+			sleep(2)	
+
+
+
+			#########
+			continue 
+			########
 
 			function fj!(F, J,  x)
 	
@@ -831,6 +746,7 @@ end
 			end 
 
 
+
 	
 			fj!(rand(nx),rand(nx,nx),rand(nx)) 
 			fj!(nothing,rand(nx,nx),rand(nx)) 
@@ -839,7 +755,7 @@ end
 	
 			init_point =  proposed_gofx.(x) 
 			
-			sol = NLsolve.nlsolve(NLsolve.only_fj!(fj!), init_point,	)#show_trace=true,store_trace=true)
+			sol = NLsolve.nlsolve(NLsolve.only_fj!(fj!), init_point)
 	
 			any(isnan, sol.zero) && continue 
 

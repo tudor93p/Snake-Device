@@ -1,4 +1,4 @@
-module GL
+module GL_old
 #############################################################################
 
 import LinearAlgebra, Combinatorics, QuadGK 
@@ -15,7 +15,7 @@ using Constants: MAIN_DIM
 
 import ..Lattice, ..Hamiltonian 
 
-import ..utils, ..Taylor, ..CentralDiff
+import ..utils, ..Taylor, ..CentralDiff, ..algebra
 
 const WARN_OBSOLETE = false 
 
@@ -745,23 +745,20 @@ function eval_free_en((etas, fields, tensors), g::Vararg{<:Real})::Float64
 end  
 
 
-
 function eval_free_en_deriv1(
 									 (etas, fields, tensors), 
 									 T::Vararg{<:Real,N})::Vector{Float64} where N
 
-	eval_free_en_deriv1(N, fields[1], tensors, 
-											eval_fields(etas,  T...)...)
+	eval_free_en_deriv1(N, fields[1], tensors, eval_fields(etas,  T...)...)
 
 end  
 
 
-function eval_free_en_deriv1!(f1::AbstractVector{Float64},
+function eval_free_en_deriv1!(f1::AbstractVector{<:Number},
 									 (etas, fields, tensors), 
 									 T::Vararg{<:Real})::Nothing 
 
-	eval_free_en_deriv1!(f1, fields[1], tensors, 
-											eval_fields(etas,  T...)...)
+	eval_free_en_deriv1!(f1, fields[1], tensors, eval_fields(etas,  T...)...)
 
 end  
 
@@ -778,7 +775,7 @@ end
 
 
 
-function eval_free_en_deriv1!(f1::AbstractVector{Float64},
+function eval_free_en_deriv1!(f1::AbstractVector{<:Number},
 													fields::NTuple{2,Symbol},
 													tensors,
 													field_vals::NTuple{4,AbstractVecOrMat},
@@ -804,7 +801,7 @@ function eval_free_en_deriv1!(f1::AbstractVector{Float64},
 
 	end 
 
-	return #f1 
+	return 
 
 end 
  
@@ -944,14 +941,164 @@ end
 #
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
 	
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+function rNJ_iter_inner!(g::AbstractVecOrMat,
+												 z::AbstractVector,
+												 J::AbstractMatrix{<:Number},
+												 a::AbstractVector{Float64},
+											nr_steps::Int,
+											relaxation::Real;
+											warn::Bool=false,
+											kwargs...
+											)::Bool  
+
+	if warn 
+
+		n1 = norm(J-transpose(J))
+
+		n2 = norm(J)  
+
+		if n2 > 1e-10 && n1/n2 > 1e-10 
+
+		#	@show LinearAlgebra.issymmetric(J)
+
+			@warn "The Jacobian is not symmetric. Relative asymmetry: $(n1/n2)"
+
+		end 
+
+	end 
+	
+	J_ = LinearAlgebra.SymTridiagonal(LinearAlgebra.Symmetric(real(J))
+																		)::LinearAlgebra.SymTridiagonal{Float64}
+
+	try 
+
+		algebra.linearSystem_Jacobi!!(z, J_, -a, nr_steps) 
+
+	catch 
+
+		return false 
+
+	end 
+
+
+	for I in LinearIndices(g)
+
+		isnan(z[I]) && return false 
+		isinf(z[I]) && return false 
+
+		g[I] += relaxation*real(z[I])
+
+	end  
+
+	return true
+
+end 
+
+
+function derivs12_on_mvd(Data,
+									mvd::AbstractArray{Float64},
+									mesh::Vararg{Float64,N};
+									kwargs...
+									)::NTuple{3,Array} where N
+
+	dA, d2A, aux = CentralDiff.derivs12_on_mvd!(Data,
+															 eval_free_en_deriv1!,
+															 eval_free_en_deriv2!,
+															 mvd, ComplexF64, mesh...)
+
+	return real(dA),real(d2A),aux
+
+end 
 
 
 
 
+function derivs12_on_mvd!(Data,
+									 mvd::AbstractArray{Float64},
+									 dA::AbstractVector, d2A::AbstractMatrix, aux::AbstractArray,
+									 mesh::Vararg{Real}; 
+									 kwargs...
+									 )::Nothing
+	 
+	CentralDiff.derivs12_on_mvd!(aux, dA, d2A, Data,
+															 GL.eval_free_en_deriv1!,
+															 GL.eval_free_en_deriv2!,
+															 mvd, mesh...)
 
+end  
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function rNJ_converged(sol::AbstractVecOrMat, 
+											 corr::AbstractVector,
+											 rtol::Real=7)::Bool 
+
+	LinearAlgebra.norm(corr)/LinearAlgebra.norm(sol)<Utils.tolNF(rtol)[2]
+
+end 
+
+function rNJ_converged(zero_goal::AbstractVector,
+											 atol::Real=7
+											 )::Bool 
+	
+	LinearAlgebra.norm(zero_goal)<Utils.tolNF(atol)[2]
+	
+end 
+
+
+#function rNJ_converged(sol::AbstractVecOrMat, 
+#											 corr::AbstractVector,
+#											 rtol::Real,
+#											 zero_goal::AbstractVector,
+#											 atol...
+#											 )::Bool
+#
+#	rNJ_converged(sol,corr,rtol) && rNJ_converged(zero_goal, atol...)
+#
+#end 
+#
+#function rNJ_converged(zero_goal::AbstractVector, atol::Real,
+#											 sol::AbstractVecOrMat, 
+#											 corr::AbstractVector,
+#											 rtol...
+#											 )::Bool
+#
+#	rNJ_converged(zero_goal, atol) && rNJ_converged(sol,corr,rtol...)
+#
+#end 
+
+function rNJ_converged(sol::AbstractVecOrMat, 
+											 corr::AbstractVector,
+											 zero_goal::AbstractVector, 
+											 rtol::Real=7,
+											 atol::Real=7,
+											 )::Bool
+
+	rNJ_converged(sol,corr,rtol) && rNJ_converged(zero_goal, atol)
+
+end
 
 
 
@@ -962,11 +1109,107 @@ end
 #
 #---------------------------------------------------------------------------#
 
+function rNJ!(g::AbstractVecOrMat, 
+						 Data, 
+						 relaxation::Real, 
+						 mesh::AbstractVector,
+						 args...; kwargs...)::Tuple{Bool,Vector{Array}}
+
+	rNJ!(g, Data, 1, relaxation, mesh, args...)
+
+end
+
+
+						 
+
+function rNJ!(g::AbstractVecOrMat, 
+						 Data, 
+						 nr_steps::Int,
+						 relaxation::Real, 
+						 mesh::AbstractVector{<:Real},
+						 fs::AbstractVector{Tuple{Function,<:Any}
+																}=Tuple{Function,Any}[]
+						 ;
+						 maxiter::Int=300,
+						 verbose::Bool=false,
+						 )::Tuple{Bool,Vector{Array}}
+
+	out = Vector{Array}([Array{Float64}(undef,d...,
+																			div(maxiter,10)) for (f,d) in fs])
+
+	
+
+	mvd = CentralDiff.midval_and_deriv(g, mesh...)
+
+	dA,d2A,aux = derivs12_on_mvd(Data, mvd, mesh...; warn=verbose) 
+
+	z = zeros(length(g))  
+
+
+
+	for r = 1:maxiter 
+	
+		if (r-1)%10==0 
+			
+			for (k,(f!,d)) in enumerate(fs)
+
+				f!(selectdim(out[k], length(d)+1, 1+div(r-1,10)), Data, mvd, mesh...)
+
+			end  
+
+		end 
+
+
+
+		if !rNJ_iter_inner!(g, z, d2A, dA, nr_steps, relaxation; warn=verbose)
+
+			verbose && @warn "The inner part of iteration $r errored before convergence was achieved" 
+
+			return (false, [selectdim(f, ndims(f), 1:div(r-1,10)) for f in out])
+
+		end 
+
+
+		CentralDiff.midval_and_deriv!(mvd, g, mesh...) 
+
+
+
+
+		#		-----------  iteration r ends here ----------- #
+
+
+		if rNJ_converged(g,z,dA) 
+			
+			verbose && println("Converged after $r iterations")
+		
+			return (true, out)
+
+		elseif r==maxiter
+
+			verbose && @warn "Did not converge after $maxiter iterations"
+
+			return (false, out)
+
+		end 
+
+
+		# ------- part of iteration r+1 ------------- #
+
+		derivs12_on_mvd!(Data, mvd, dA, d2A, aux, mesh...)
+
+	end 
+
+
+end 
 
 
 
 
 
+
+
+
+	
 
 
 
@@ -1408,6 +1651,14 @@ end
 #
 #end 
 
+function eval_free_en_on_mvd!(out::AbstractArray, args...)::Nothing 
+
+	setindex!(out, eval_free_en_on_mvd(args...), 1)
+
+	return 
+
+end 
+
 
 function eval_free_en_on_mvd(
 														 data, mvd::AbstractArray{Float64,N1}, 
@@ -1420,27 +1671,30 @@ function eval_free_en_on_mvd(
 	
 end 
 
-function eval_deriv1_on_mvd!(A::AbstractArray{Float64,N1},
-														 data, mvd::AbstractArray{Float64,N1}, 
-														 steps::Vararg{Real,N}
-														 )::Nothing where {N,N1}
 
-	@assert N1==N+1 && N in 1:2
 
-	A .= 0.0
 
-	CentralDiff.eval_fct_on_mvd!(A, data, eval_free_en_deriv1!, mvd, 
-																	(N+1,), steps...)
-
-	for (a,w) in zip(CentralDiff.mvd_container(A), 
-									 CentralDiff.central_diff_w(steps...))
-		a .*= w
-
-	end 
-
-	return  
-
-end  
+#function eval_deriv1_on_mvd!(A::AbstractArray{Float64,N1},
+#														 data, mvd::AbstractArray{Float64,N1}, 
+#														 steps::Vararg{Real,N}
+#														 )::Nothing where {N,N1}
+#
+#	@assert N1==N+1 && N in 1:2
+#
+#	A .= 0.0
+#
+#	CentralDiff.eval_fct_on_mvd!(A, data, eval_free_en_deriv1!, mvd, 
+#																	(N+1,), steps...)
+#
+#	for (a,w) in zip(CentralDiff.mvd_container(A), 
+#									 CentralDiff.central_diff_w(steps...))
+#		a .*= w
+#
+#	end 
+#
+#	return  
+#
+#end  
 
 
 
@@ -1511,6 +1765,8 @@ function eval_deriv2_on_mvd!(A::AbstractArray{ComplexF64,N2},
 		A[j,:,:,:] .*= w[j]
 
 	end 
+
+	@assert isreal(A) 
 
 	return  
 
