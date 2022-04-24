@@ -28,17 +28,12 @@ export Hamiltonian
 
 
 
+include("GinzburgLandau_draft.jl")
+include("GinzburgLandau.jl")
 
 include("Hamilt_Diagonaliz.jl") 
 
-include("utils.jl") 
-include("algebra.jl") 
-include("Taylor.jl") 
 
-include("CentralDiff.jl")
-#include("GinzburgLandau_draft.jl")
-
-include("GinzburgLandau.jl")
 
 include("GreensFcts.jl")
 

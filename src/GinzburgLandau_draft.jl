@@ -3,7 +3,8 @@ module GL_old
 
 import LinearAlgebra, Combinatorics, QuadGK 
 
-import myLibs: Utils, Algebra
+import myLibs: Utils, Algebra, Taylor, CentralDiff
+
 
 using OrderedCollections: OrderedDict 
 
@@ -15,7 +16,6 @@ using Constants: MAIN_DIM
 
 import ..Lattice, ..Hamiltonian 
 
-import ..utils, ..Taylor, ..CentralDiff, ..algebra
 
 const WARN_OBSOLETE = false 
 
@@ -76,6 +76,8 @@ function iterate_GL_terms(coeffs::AbstractVector{<:Real},
 													indsets::AbstractVector{<:Tuple{<:Real,<:AbstractVector}}
 													)::Base.Iterators.Flatten
 
+	warn()
+
 	@assert length(coeffs) == length(indsets)
 
 	((c1*c2,comb) for (c1,(c2,combs)) in zip(coeffs,indsets) for comb in combs)
@@ -101,31 +103,6 @@ end
 
 
 
-
-
-function BCS_coherence_length(Delta0::Real)::Float64
-
-	0.7/Delta0
-
-end  
-
-function eta_magnitude_squared(Delta0::Real)::Float64 
-
-	2*Delta0^2
-
-end 
-
-function get_K_ampl(Delta0::Real,b::Real=1)::Float64 
-
-	2b*eta_magnitude_squared(Delta0)*BCS_coherence_length(Delta0) 
-
-end 
-
-function get_coeff_a(Delta0::Real,b::Real=1)::Vector{Float64}
-
-	[-eta_magnitude_squared(Delta0)*b]
-
-end 
 
 
 function covariant_derivative(etaJacobian::T
@@ -252,25 +229,6 @@ end
 
 
 
-function bs_from_anisotropy(nu::Real,b::Real=1)::Vector{Float64}
-
-	[(3+nu)/8, (1-nu)/4, - (3nu+1)/4]*b
-
-end 
-
-function Ks_from_anisotropy(nu::Real,K::Real)::Vector{Float64}
-
-	vcat(3+nu, fill(1-nu,3), 0)*K/4 
-	
-end 
-
-function get_coeffs_Ks(nu::Real,Delta0::Real,b::Real=1)::Vector{Float64}
-
-	Ks_from_anisotropy(nu,get_K_ampl(Delta0,b))
-
-end  
-
-
 
 
 
@@ -320,889 +278,11 @@ end
 #---------------------------------------------------------------------------#
 
 
-
-
-function D4h_density_homog_(a::Union{Real,AbstractVector{<:Real}},
-														b::AbstractVector{<:Real}
-													 )::Taylor.Scalar{2}
-	
-	etas = ("eta","eta*")
-
-	return +(
-
-		first(a)*sum(prod(Taylor.Product(eta,i) for eta=etas) for i=1:2),
-
-		b[1]*sum(prod((Taylor.Product(eta,i,i) for eta=etas)) for i=1:2),
-
-		b[1]*sum(prod((Taylor.Product(eta,i,other[i]) for eta=etas)) for i=1:2),
-
-		b[2]/2 * sum(Taylor.Product("eta",i,i)*Taylor.Product("eta*",other[i],other[i]) for i=1:2),
-
-		b[3] * prod(Taylor.Product(eta,1,2) for eta in etas)
-		)
-
-end 
-
-
-
-
-function D4h_density_grad_(k::AbstractVector{<:Real})::Taylor.Scalar{2}
-
-
-	Ds = ("D","D*")
-
-	return +(
-
-		k[1]*sum(prod(Taylor.Product(D,rep(i)) for D in Ds) for i=1:2),
-	
-		k[2]*sum(prod(Taylor.Product(D, [i,other[i]]) for D in Ds) for i=1:2),
-	
-		k[3]*sum(Taylor.Product("D", rep(i))*Taylor.Product("D*", rep(other[i])) for i=1:2), 
-	
-		k[4]*sum(Taylor.Product("D",[i,other[i]])*Taylor.Product("D*",[other[i],i]) for i=1:2),
-	
-		k[5]*sum(prod(Taylor.Product(D,[3,i]) for D in Ds) for i=1:2),
-
-		)
-
-
-end 
-
-
-
 #===========================================================================#
 #
 #
 #
 #---------------------------------------------------------------------------#
-
-
-function get_field(data, field::Symbol, args...)
-	
-	get_field(data, Val(field), args...)
-
-end  
-
-#function get_field(data,fields::Union{AbstractVector{Symbol},
-#																		 Tuple{Vararg{Symbol}}},
-#									 )::Vector{VecOrMat{ComplexF64}}
-#
-#	[get_field(data,k) for k in fields]
-#
-#end 
-
-function get_field(((eta0,),), ::Val{:N}, )::Vector{ComplexF64}
-
-	eta0 
-
-end  
-
-
-function get_field((etas,), ::Val{:N}, I::Taylor.Index{1},
-									 mus::Vararg{Int,Ord})::ComplexF64 where Ord 
-
-	@assert 0<= Ord <= 2
-	@assert all(in(0:3),mus)
-
-	all(==(0), mus) ? I(etas[Ord+1]) : 0 
-
-end 
-
-
-function get_field((etas,D,), ::Val{:D})::Matrix{ComplexF64}
-
-	D
-
-end 
-
-
-function get_field((etas, D,), ::Val{:D}, I::Taylor.Index{2})::ComplexF64 
-
-	I(D)
-
-end 
-
-
-function get_field(((eta0,eta1,eta2,),D, grad,), 
-									 ::Val{:D}, 
-									 I::Taylor.Index{2},
-									 mu::Int
-									)::ComplexF64 
-
-	@assert 0<=mu<=3
-
-	(i,j) = I.I 
-	
-	@assert 1<=i<=3 && 1<=j<=2
-
-
-	mu==0 && return eta2[j]*grad[i]
-
-	mu==i && return eta1[j]
-
-	return 0
-
-end 
-
-function get_field(data, ::Val{:Dc}, args...)
-	
-	conj(get_field(data, Val(:D), args...))
-
-end  
-
-function get_field(data, ::Val{:Nc}, args...)
-	
-	conj(get_field(data, Val(:N), args...))
-
-
-end 
-
-									 
-
-
-function get_field(((eta0,eta1,eta2,eta3),D,grad,), ::Val{:D}, 
-									 I::Taylor.Index{2}, mu::Int, nu::Int
-									)::ComplexF64 
-
-	@assert 0<=mu<=3
-	@assert 0<=nu<=3
-
-
-	(i,j) = I.I 
-
-	@assert 1<=i<=3 && 1<=j<=2
-
-	mu==nu==0 && return eta3[j]*grad[i]
-
-	mu==0 && nu==i && return eta2[j]
-
-	nu==0 && mu==i && return eta2[j]
-
-	return 0
-
-end 
-
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-function fields4(((eta,),D,) # possibly incomplete data 
-								 )::Tuple{AbstractVector{ComplexF64},
-													AbstractVector{ComplexF64},
-													AbstractMatrix{ComplexF64},
-													AbstractMatrix{ComplexF64}}
-
-	(eta, conj(eta), D, conj(D))
-
-end 
-
-function fields2(((eta,),)::Tuple{Tuple{AbstractVector}} # incomplete data 
-								 )::Tuple{AbstractVector{ComplexF64},
-													AbstractVector{ComplexF64},
-													}
-	(eta, conj(eta))
-
-end 
-
-
-function eval_fields((f0, )::NTuple{1,Function}, 
-										 g::Real, grad::Vararg{<:Real}
-										 )::Tuple 
-
-	eta0 = f0(tanh(g))
-
-	partial_data = ((eta0,),)  # almost no data 
-
-	return fields2(partial_data), partial_data
-
-end 
-
-
-function eval_fields((f0, f1)::NTuple{2,Function}, 
-										 g::Real, gx::Real, gy::Real=0, gz::Real=0,
-										 )::Tuple 
-
-	t0 = tanh(g)
-
-	eta0 = f0(t0) 
-
-	eta1 = f1(t0)*(1 - t0^2)
-
-
-	grad = [gx,gy,gz]
-	
-	D = chain_rule_outer(eta1, grad)  # size(D)==(3,2)
-
-	partial_data = ((eta0,eta1), D, grad)  # incomplete data 
-
-	return fields4(partial_data),partial_data
-
-end 
-
-
-function eval_fields((f0, f1, f2, f3)::Tuple{Function,
-																						 Function,
-																						 Function,
-																						 Nothing},
-										 g::Real, gx::Real, gy::Real=0, gz::Real=0,
-										 )::Tuple
-
-#	sympy derivatives of tanh:
-#[t0, 1 - t0**2, 2*t0*(t0**2 - 1), -2*(t0**2 - 1)*(3*t0**2 - 1)]
-#[t0, 1 - t0^2, 2*t0*(t0^2 - 1), -2*(t0^2 - 1)*(3*t0^2 - 1)]
-#
-# sympy derivatives eta(tanh(g))
-#[N0, N1*t1, N1*t2 + N2*t1**2, N1*t3 + 3*N2*t1*t2 + N3*t1**3]
-#[N0, N1*t1, N1*t2 + N2*t1^2, N1*t3 + 3*N2*t1*t2 + N3*t1^3]
-
-
-	t0 = tanh(g)
-	t1 = 1 - t0^2
- 
-
-	N2::Vector{ComplexF64} = f2(t0)
-	N1::Vector{ComplexF64} = f1(t0)
-	eta0::Vector{ComplexF64} = f0(t0)
-
-
-	eta1 = N1*t1 
-
-	eta2 = -N1*2*t0*t1 
-	eta2 += N2*t1^2
-	
-	
-#	f1_(x) = (1 - tanh(x)^2)*f1(tanh(x)) 
-#	f2_(x) = f2(tanh(x))*(1 - tanh(x)^2)^2 + f1(tanh(x))*2*tanh(x)*(tanh(x)^2 - 1) 
-#
-#
-#	@assert utils.test_derivative(f0, f1, 2rand()-1)
-#	@assert utils.test_derivative(f1, f2, 2rand()-1)
-#	@assert utils.test_derivative(f0∘tanh, f1_, 2rand()-1)
-#	@assert utils.test_derivative(f1_, f2_, 2rand()-1)
-
-	eta3::Vector{ComplexF64} = t1^3 * utils.numerical_derivative(f2,t0,1e-4) 
-	eta3 += -6*N2*t1^2*t0
-	eta3 += 2*eta1*(2*t0^2 - t1) 
-
-	
-	grad = [gx,gy,gz]
-
-	full_data = ((eta0,eta1,eta2,eta3), chain_rule_outer(eta1, grad), grad) 
-
-
-
-	return fields4(full_data), full_data
-
-end  
-
-
-#function eval_fields(
-#										 (f_eta0,f_eta1,f_eta2),
-#										 t::Real,tx::Real,ty::Real=0
-#												)
-#
-#	eta0 = f_eta0(t)
-#
-#	eta1 = f_eta1(t)
-#
-#	eta2 = f_eta2(t)
-#		
-#	eta3 = utils.numerical_derivative(f_eta2, t, 1e-4)
-#
-#
-#	txy = [tx,ty]
-#
-#	D = chain_rule_outer(eta1, txy)
-#
-#	data = ((eta0,eta1,eta2,eta3),
-#					D,
-#					txy)
-#
-#	return [eta0,conj(eta0),D,conj(D)], data 
-#
-##	return get_field(data, argmax(length, fields)), data 
-#
-#end 
-
-
-#function get_field((f_eta0, f_eta1, 
-#									 )::Tuple{Function,Function,Function,Nothing},
-#									 g::Vararg{Real} 
-#												)
-#
-#	fields4(eval_fields((f_eta0, f_eta1), g...))
-#
-#end 
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-
-
-
-
-
-
-function get_Data(P::UODict)
-
-	Delta0 = real(only(unique(Hamiltonian.eta_magnitudes(P))))
-	
-	anisotropy = 0#-0.6
-	
-	a = get_coeff_a(Delta0)
-	
-	b = bs_from_anisotropy(anisotropy)
-	
-	K = get_coeffs_Ks(anisotropy,Delta0)
-
-
-
-	F = D4h_density_homog_(a,b) + D4h_density_grad_(K) 
-
-
-	fields1 = ["eta","D"]
-	fields2 = ["eta","eta*","D","D*"]
-	fields_symb = ((:N,:D), (:N, :Nc, :D, :Dc))
-
-#	fields1 = fields2 = ["eta","eta*","D","D*"]
-#	fields_symb = ((:N,:Nc,:D,:Dc), (:N, :Nc, :D, :Dc))
-
-
-	dF = Vector{Taylor.Tensor{1}}(undef, length(fields1))
-	
-	d2F = Matrix{Taylor.Tensor{2}}(undef, length(fields1), length(fields2))
-
-
-	for (i,field1) in enumerate(fields1)
-
-		dF[i] = Taylor.Tensor_fromDeriv(F, field1)
-
-		for (j,field2) in enumerate(fields2)
-
-			d2F[i,j] = Taylor.Tensor_fromDeriv(dF[i], field2) 
-
-		end 
-
-	end 
-		
-	return ((Hamiltonian.eta_interp(P),
-					 Hamiltonian.eta_interp_deriv(P),
-					 Hamiltonian.eta_interp_deriv2(P),
-					 nothing, # no analytical expression known 
-					 ),
-					fields_symb, (F, dF, d2F)
-					)
-
-end  
-
-function get_functional((F,),)::Taylor.Scalar 
-
-	F 
-
-end 
-
-
-function get_functional((F,dF,), i::Int)::Taylor.Tensor
-
-	dF[i]
-
-end 
-
-
-function get_functional((F,dF,d2F), i::Int, j::Int)::Taylor.Tensor
-
-	d2F[i,j]
-
-end 
-
-
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-
-
-function eval_free_en((etas, fields, tensors), g::Vararg{<:Real})::Float64
-
-	field_vals, = eval_fields(etas[1:2], g...)
-
-	f = get_functional(tensors)
-
-	return utils.ignore_zero_imag(f(field_vals...))
-
-end  
-
-
-function eval_free_en_deriv1(
-									 (etas, fields, tensors), 
-									 T::Vararg{<:Real,N})::Vector{Float64} where N
-
-	eval_free_en_deriv1(N, fields[1], tensors, eval_fields(etas,  T...)...)
-
-end  
-
-
-function eval_free_en_deriv1!(f1::AbstractVector{<:Number},
-									 (etas, fields, tensors), 
-									 T::Vararg{<:Real})::Nothing 
-
-	eval_free_en_deriv1!(f1, fields[1], tensors, eval_fields(etas,  T...)...)
-
-end  
-
-function eval_free_en_deriv1(N::Int,
-														 args...)::Vector{Float64}
-
-	f1 = zeros(Float64, N)
-
-	eval_free_en_deriv1!(f1, args...)
-
-	return f1 
-
-end 
-
-
-
-function eval_free_en_deriv1!(f1::AbstractVector{<:Number},
-													fields::NTuple{2,Symbol},
-													tensors,
-													field_vals::NTuple{4,AbstractVecOrMat},
-													#AbstractVector{<:AbstractArray},
-													field_data,
-													)::Nothing
-
-	for (i_psi,psi) in enumerate(fields)
-
-		for ((I,),S) in get_functional(tensors,i_psi)
-
-			s::ComplexF64 = S(field_vals...)::ComplexF64
-			
-			for k=1:length(f1)
-
-				p::ComplexF64 = get_field(field_data, psi, I, k-1)::ComplexF64
-
-				f1[k] += 2real(p*s)
-
-			end 
-
-		end 
-
-	end 
-
-	return 
-
-end 
- 
-
-
-function eval_free_en_deriv2!(
-															A::AbstractMatrix{ComplexF64},
-									 (etas, fields, tensors), 
-									 T::Vararg{<:Real})::Nothing 
-
-	eval_free_en_deriv2!(A,
-											 fields, tensors, 
-											 eval_fields(etas,  T...)...)
-
-end  
-
-
-function eval_free_en_deriv2(
-									 (etas, fields, tensors), 
-									 T::Vararg{<:Real,N})::Matrix{Float64} where N
-
-	f2 = zeros(ComplexF64,N,N)
-
-	eval_free_en_deriv2!(f2,
-											 fields, tensors, 
-											 eval_fields(etas,  T...)...) 
-
-	@assert isreal(f2)
-
-	return real(f2)
-
-end   
-
-
-
-
-function eval_free_en_deriv2!(f2::AbstractMatrix{ComplexF64},
-													(fields1,fields2)::Tuple{NTuple{2,Symbol},
-																									 NTuple{4,Symbol}},
-													tensors,
-													#field_vals::AbstractVector{<:AbstractArray},
-													field_vals::NTuple{4,AbstractVecOrMat},
-													field_data,
-													)::Nothing 
-#
-#function eval_free_en_deriv2(
-#													(fields1,fields2)::Tuple{NTuple{2,Symbol},
-#																									 NTuple{4,Symbol}},
-#													tensors,
-#													field_vals::AbstractVector{<:AbstractArray},
-#													field_data,
-#													N::Int,
-#													)::Matrix{Float64}
-
-
-
-	for (i_psi,psi) in enumerate(fields1)
-
-		for ((I,),S) in get_functional(tensors,i_psi)
-
-			s::ComplexF64 = S(field_vals...)::ComplexF64
-			
-			for n=axes(f2,2), k=axes(f2,1)
-
-				p::ComplexF64 = get_field(field_data, psi, I, k-1, n-1)::ComplexF64 
-
-				f2[k,n] += s*p
-
-			end 
-
-		end 
-
-	#end 
-
-
-
-	#for (i_psi,psi) in enumerate(fields1)
-
-		for (i_phi,phi) in enumerate(fields2)
-			
-			for ((I,J),S) in get_functional(tensors, i_psi, i_phi)
-
-				s::ComplexF64 = S(field_vals...)::Union{Float64,ComplexF64}
-			
-				for n=axes(f2,2), k=axes(f2,1)
-	
-					f2[k,n] += *(s,
-											 get_field(field_data, psi, I, k-1)::ComplexF64,
-											 get_field(field_data, phi, J, n-1)::ComplexF64
-											 )
-				end 
-		
-			end 
-
-		end 
-
-	end 
-
-	
-	
-	for i in eachindex(f2)
-
-		f2[i] += conj(f2[i])
-
-	end 
-
-
-	return 
-
-end 
-
-
-
-
-
-
-
-#	for (i_psi,psi) in enumerate(fields1)
-#
-#		for ((I,),S) in get_functional(tensors,i_psi)
-#
-#			s = S(field_vals...)
-#			
-#			for k = 1:N
-#
-#				f1[k] += 2real(s*get_field(field_data, psi, I, k-1))
-#
-#				for n = 1:N
-#
-#					f2[k,n] += s*get_field(field_data, psi, I, k-1, n-1)
-#
-#				end 
-#
-#			end 
-#
-#		end 
-#
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-
-	
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-
-function rNJ_iter_inner!(g::AbstractVecOrMat,
-												 z::AbstractVector,
-												 J::AbstractMatrix{<:Number},
-												 a::AbstractVector{Float64},
-											nr_steps::Int,
-											relaxation::Real;
-											warn::Bool=false,
-											kwargs...
-											)::Bool  
-
-	if warn 
-
-		n1 = norm(J-transpose(J))
-
-		n2 = norm(J)  
-
-		if n2 > 1e-10 && n1/n2 > 1e-10 
-
-		#	@show LinearAlgebra.issymmetric(J)
-
-			@warn "The Jacobian is not symmetric. Relative asymmetry: $(n1/n2)"
-
-		end 
-
-	end 
-	
-	J_ = LinearAlgebra.SymTridiagonal(LinearAlgebra.Symmetric(real(J))
-																		)::LinearAlgebra.SymTridiagonal{Float64}
-
-	try 
-
-		algebra.linearSystem_Jacobi!!(z, J_, -a, nr_steps) 
-
-	catch 
-
-		return false 
-
-	end 
-
-
-	for I in LinearIndices(g)
-
-		isnan(z[I]) && return false 
-		isinf(z[I]) && return false 
-
-		g[I] += relaxation*real(z[I])
-
-	end  
-
-	return true
-
-end 
-
-
-function derivs12_on_mvd(Data,
-									mvd::AbstractArray{Float64},
-									mesh::Vararg{Float64,N};
-									kwargs...
-									)::NTuple{3,Array} where N
-
-	dA, d2A, aux = CentralDiff.derivs12_on_mvd!(Data,
-															 eval_free_en_deriv1!,
-															 eval_free_en_deriv2!,
-															 mvd, ComplexF64, mesh...)
-
-	return real(dA),real(d2A),aux
-
-end 
-
-
-
-
-function derivs12_on_mvd!(Data,
-									 mvd::AbstractArray{Float64},
-									 dA::AbstractVector, d2A::AbstractMatrix, aux::AbstractArray,
-									 mesh::Vararg{Real}; 
-									 kwargs...
-									 )::Nothing
-	 
-	CentralDiff.derivs12_on_mvd!(aux, dA, d2A, Data,
-															 GL.eval_free_en_deriv1!,
-															 GL.eval_free_en_deriv2!,
-															 mvd, mesh...)
-
-end  
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-function rNJ_converged(sol::AbstractVecOrMat, 
-											 corr::AbstractVector,
-											 rtol::Real=7)::Bool 
-
-	LinearAlgebra.norm(corr)/LinearAlgebra.norm(sol)<Utils.tolNF(rtol)[2]
-
-end 
-
-function rNJ_converged(zero_goal::AbstractVector,
-											 atol::Real=7
-											 )::Bool 
-	
-	LinearAlgebra.norm(zero_goal)<Utils.tolNF(atol)[2]
-	
-end 
-
-
-#function rNJ_converged(sol::AbstractVecOrMat, 
-#											 corr::AbstractVector,
-#											 rtol::Real,
-#											 zero_goal::AbstractVector,
-#											 atol...
-#											 )::Bool
-#
-#	rNJ_converged(sol,corr,rtol) && rNJ_converged(zero_goal, atol...)
-#
-#end 
-#
-#function rNJ_converged(zero_goal::AbstractVector, atol::Real,
-#											 sol::AbstractVecOrMat, 
-#											 corr::AbstractVector,
-#											 rtol...
-#											 )::Bool
-#
-#	rNJ_converged(zero_goal, atol) && rNJ_converged(sol,corr,rtol...)
-#
-#end 
-
-function rNJ_converged(sol::AbstractVecOrMat, 
-											 corr::AbstractVector,
-											 zero_goal::AbstractVector, 
-											 rtol::Real=7,
-											 atol::Real=7,
-											 )::Bool
-
-	rNJ_converged(sol,corr,rtol) && rNJ_converged(zero_goal, atol)
-
-end
-
-
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-function rNJ!(g::AbstractVecOrMat, 
-						 Data, 
-						 relaxation::Real, 
-						 mesh::AbstractVector,
-						 args...; kwargs...)::Tuple{Bool,Vector{Array}}
-
-	rNJ!(g, Data, 1, relaxation, mesh, args...)
-
-end
-
-
-						 
-
-function rNJ!(g::AbstractVecOrMat, 
-						 Data, 
-						 nr_steps::Int,
-						 relaxation::Real, 
-						 mesh::AbstractVector{<:Real},
-						 fs::AbstractVector{Tuple{Function,<:Any}
-																}=Tuple{Function,Any}[]
-						 ;
-						 maxiter::Int=300,
-						 verbose::Bool=false,
-						 )::Tuple{Bool,Vector{Array}}
-
-	out = Vector{Array}([Array{Float64}(undef,d...,
-																			div(maxiter,10)) for (f,d) in fs])
-
-	
-
-	mvd = CentralDiff.midval_and_deriv(g, mesh...)
-
-	dA,d2A,aux = derivs12_on_mvd(Data, mvd, mesh...; warn=verbose) 
-
-	z = zeros(length(g))  
-
-
-
-	for r = 1:maxiter 
-	
-		if (r-1)%10==0 
-			
-			for (k,(f!,d)) in enumerate(fs)
-
-				f!(selectdim(out[k], length(d)+1, 1+div(r-1,10)), Data, mvd, mesh...)
-
-			end  
-
-		end 
-
-
-
-		if !rNJ_iter_inner!(g, z, d2A, dA, nr_steps, relaxation; warn=verbose)
-
-			verbose && @warn "The inner part of iteration $r errored before convergence was achieved" 
-
-			return (false, [selectdim(f, ndims(f), 1:div(r-1,10)) for f in out])
-
-		end 
-
-
-		CentralDiff.midval_and_deriv!(mvd, g, mesh...) 
-
-
-
-
-		#		-----------  iteration r ends here ----------- #
-
-
-		if rNJ_converged(g,z,dA) 
-			
-			verbose && println("Converged after $r iterations")
-		
-			return (true, out)
-
-		elseif r==maxiter
-
-			verbose && @warn "Did not converge after $maxiter iterations"
-
-			return (false, out)
-
-		end 
-
-
-		# ------- part of iteration r+1 ------------- #
-
-		derivs12_on_mvd!(Data, mvd, dA, d2A, aux, mesh...)
-
-	end 
-
-
-end 
-
-
 
 
 
@@ -1258,6 +338,8 @@ function D4h_density_homog_old((x,y)::AbstractVector{<:Number},
 													 b::AbstractVector{<:Real},
 													)::Float64
 
+	warn()
+
 	@assert length(b)==3  
 
 	f::Float64 = 0.0 
@@ -1286,6 +368,8 @@ function D4h_density_homog(eta::AbstractVector{<:Number},
 														coeffs_ord4::AbstractVector{<:Real},
 													)::ComplexF64
 
+	warn()
+
 	f::ComplexF64 = 0.0 + 0.0im 
 
 	for (a,(i,j)) in iterate_GL_terms(coeffs_ord2,D4h_homog_ord2) 
@@ -1310,6 +394,8 @@ function D4h_density_homog(eta::AbstractVector{<:Number},
 														coeffs_ord4::AbstractVector{<:Real},
 													)::Float64
 
+	warn()
+
 	f = utils.ignore_zero_imag(D4h_density_homog(eta, conj(eta), coeffs_ord2, coeffs_ord4))
 
 	@assert f ≈ D4h_density_homog_old(eta,coeffs_ord2[1],coeffs_ord4)
@@ -1323,6 +409,8 @@ function D4h_density_homog_deriv(eta::AbstractVector{<:Number},
 																 coeffs_ord2::AbstractVector{<:Real},
 																 coeffs_ord4::AbstractVector{<:Real},
 																 )::Vector{ComplexF64}
+
+	warn()
 
 	etac = conj(eta)
 
@@ -1350,6 +438,8 @@ function D4h_density_homog_deriv2(eta::AbstractVector{<:Number},
 																 coeffs_ord2::AbstractVector{<:Real},
 																 coeffs_ord4::AbstractVector{<:Real},
 																 )#::Vector{ComplexF64}
+
+	warn()
 
 	etac = conj(eta)
 
@@ -1393,6 +483,9 @@ function D4h_density_homog_deriv(eta::AbstractVector{<:Number},
 																 coeffs_ord2::AbstractVector{<:Real},
 																 coeffs_ord4::AbstractVector{<:Real},
 																 )::NTuple{2,Vector{ComplexF64}}
+
+	warn() 
+
 	d = zeros(ComplexF64,2)
 	c = zeros(ComplexF64,2)
 
@@ -1457,6 +550,9 @@ function D4h_density_grad_old(D::AbstractMatrix{<:Number},
 
 #	D[i,j] = D_i eta_j 
 
+
+warn() 
+
 #	DxNx,DxNy = D[1,:]
 
 #	DyNx,DyNy = D[2,:]
@@ -1498,6 +594,9 @@ function D4h_density_grad(D::AbstractMatrix{<:Number},
 
 	@assert size(D) == size(Dc) == (3,2) 
 
+	warn() 
+
+
 	f::ComplexF64 = 0.0 + 0.0im
 
 	for (k,(I1,I2)) in iterate_GL_terms(coeffs_ord2, D4h_grad_ord2)
@@ -1513,6 +612,9 @@ end
 function D4h_density_grad(D::AbstractMatrix{<:Number},
 													coeffs_ord2::AbstractVector{<:Real}
 													 )::Float64
+
+	warn() 
+
 	
 	f = utils.ignore_zero_imag(D4h_density_grad(D,conj(D),coeffs_ord2))
 
@@ -1527,6 +629,9 @@ function D4h_density_grad_deriv(D::AbstractMatrix{<:Number},
 													)::Matrix{ComplexF64}
 
 	Dc = conj(D)
+
+
+	warn() 
 
 #	D4h_density_grad_deriv(D, conj(D), coeffs_ord2)
 
@@ -1554,6 +659,9 @@ function D4h_density_grad_deriv(D::AbstractMatrix{<:Number},
 
 	d = zeros(ComplexF64,3,2)
 	c = zeros(ComplexF64,3,2)
+
+
+	warn() 
 
 
 	for (k,(I1,I2)) in iterate_GL_terms(coeffs_ord2, D4h_grad_ord2)
@@ -1651,127 +759,6 @@ end
 #
 #end 
 
-function eval_free_en_on_mvd!(out::AbstractArray, args...)::Nothing 
-
-	setindex!(out, eval_free_en_on_mvd(args...), 1)
-
-	return 
-
-end 
-
-
-function eval_free_en_on_mvd(
-														 data, mvd::AbstractArray{Float64,N1}, 
-														 steps::Vararg{Real,N}
-														 )::Float64 where {N,N1}
-
-	@assert N1==N+1 && N in 1:2 
-
-	CentralDiff.mid_Riemann_sum(data, eval_free_en, mvd, steps...)
-	
-end 
-
-
-
-
-#function eval_deriv1_on_mvd!(A::AbstractArray{Float64,N1},
-#														 data, mvd::AbstractArray{Float64,N1}, 
-#														 steps::Vararg{Real,N}
-#														 )::Nothing where {N,N1}
-#
-#	@assert N1==N+1 && N in 1:2
-#
-#	A .= 0.0
-#
-#	CentralDiff.eval_fct_on_mvd!(A, data, eval_free_en_deriv1!, mvd, 
-#																	(N+1,), steps...)
-#
-#	for (a,w) in zip(CentralDiff.mvd_container(A), 
-#									 CentralDiff.central_diff_w(steps...))
-#		a .*= w
-#
-#	end 
-#
-#	return  
-#
-#end  
-
-
-
-
-function eval_deriv1_on_mvd(data, mvd::AbstractArray{Float64,N1}, 
-														steps::Vararg{Real,N}
-														)::Array{Float64,N+1} where {N,N1}
-
-	@assert N1==N+1 && N in 1:2
-
-	A = CentralDiff.eval_fct_on_mvd(data, eval_free_en_deriv1, mvd, 
-																	(N+1,), steps...)
-
-	for (a,w) in zip(CentralDiff.mvd_container(A), 
-									 CentralDiff.central_diff_w(steps...))
-
-		a .*= w
-
-	end 
-
-	return A 
-
-end  
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-function eval_deriv2_on_mvd(
-														 data, 
-														 mvd::AbstractArray{Float64,N1},
-														 steps::Vararg{Real,N}
-														 )::Array{ComplexF64,N+2} where {N,N1}
-
-	@assert N1==N+1 && N in 1:2 
-
-	A = zeros(ComplexF64, N+1, N+1, size(mvd)[2:end]...)
-
-	eval_deriv2_on_mvd!(A, data, mvd, steps...)
-
-	@assert isreal(A) 
-
-	return A
-
-end 
-
-function eval_deriv2_on_mvd!(A::AbstractArray{ComplexF64,N2},
-														 data, mvd::AbstractArray{Float64,N1},
-														 steps::Vararg{Real,N}
-														 )::Nothing where {N,N1,N2}
-
-	@assert N1==N+1 && N2==N+2 && N in 1:2 
-
-	A .= 0.0
-
-	w = CentralDiff.central_diff_w(steps...)  
-
-	CentralDiff.eval_fct_on_mvd!(A, data, eval_free_en_deriv2!, mvd, 
-																	(N+1,N+1), steps...)
-
-	for j=1:N+1
-		
-		A[:,j,:,:] .*= w[j] 
-	
-		A[j,:,:,:] .*= w[j]
-
-	end 
-
-	@assert isreal(A) 
-
-	return  
-
-end  
-
 
 
 
@@ -1820,6 +807,9 @@ function dAdg_(midg::AbstractMatrix{Tm},
 	L = (n+1)*(m+1)
 
 	T = promote_type(Tm,Tx,Ty,Float64)
+
+	warn() 
+
 
 	P,W = CentralDiff.central_diff_PW1(h,s)
 

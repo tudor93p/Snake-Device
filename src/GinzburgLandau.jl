@@ -4,11 +4,11 @@ module GL
 import LinearAlgebra 
 
 
-import myLibs: Taylor, Utils, Algebra
+import myLibs: Taylor, Utils, Algebra, CentralDiff
 
 using myLibs.Parameters: UODict
 	
-import ..Hamiltonian  
+import ..Hamiltonian, ..Lattice 
 
 
 
@@ -263,13 +263,10 @@ end
 
 
 
-function eval_free_en((etas, fields, tensors), g::Vararg{<:Real})::Float64
+function eval_free_en((etas, fields, tensors),
+											g::Vararg{<:Real})::Float64
 
-	field_vals, = eval_fields(etas[1:2], g...)
-
-	f = get_functional(tensors)
-
-	return ignore_zero_imag(f(field_vals...))
+	ignore_zero_imag(get_functional(tensors)(eval_fields4(etas, g...)...))
 
 end  
 
@@ -341,9 +338,7 @@ function eval_free_en_deriv2!(
 									 (etas, fields, tensors), 
 									 T::Vararg{<:Real})::Nothing 
 
-	eval_free_en_deriv2!(A,
-											 fields, tensors, 
-											 eval_fields(etas,  T...)...)
+	eval_free_en_deriv2!(A, fields, tensors, eval_fields(etas,  T...)...)
 
 end  
 
@@ -354,9 +349,7 @@ function eval_free_en_deriv2(
 
 	f2 = zeros(ComplexF64,N,N)
 
-	eval_free_en_deriv2!(f2,
-											 fields, tensors, 
-											 eval_fields(etas,  T...)...) 
+	eval_free_en_deriv2!(f2, fields, tensors, eval_fields(etas,  T...)...) 
 
 	@assert isreal(f2)
 
@@ -457,12 +450,13 @@ end
 
 
 
-
 #===========================================================================#
+# 
 #
 #
 #
 #---------------------------------------------------------------------------#
+
 
 
 
@@ -573,41 +567,57 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function fields4(((eta,),D,) # possibly incomplete data 
-								 )::Tuple{AbstractVector{ComplexF64},
-													AbstractVector{ComplexF64},
-													AbstractMatrix{ComplexF64},
-													AbstractMatrix{ComplexF64}}
+#function get_fields4(((eta,),D,) # possibly incomplete data 
+#								 )::Tuple{AbstractVector{ComplexF64},
+#													AbstractVector{ComplexF64},
+#													AbstractMatrix{ComplexF64},
+#													AbstractMatrix{ComplexF64}}
+#
+#	(eta, conj(eta), D, conj(D))
+#
+#end 
+#
+#function get_fields2(((eta,),)::Tuple{Tuple{AbstractVector}} # incomplete data 
+#								 )::Tuple{AbstractVector{ComplexF64},
+#													AbstractVector{ComplexF64},
+#													}
+#	(eta, conj(eta))
+#
+#end 
 
-	(eta, conj(eta), D, conj(D))
+
+
+
+function eval_fields2((f0, ), g::Real, ::Vararg{<:Real}) 
+	
+#	eval_fields(etas[1:1], g...)[1]
+
+#end 
+
+
+#function eval_fields((f0, )::NTuple{1,Function}, 
+#										 g::Real, grad::Vararg{<:Real}
+#										 )::Tuple 
+
+	f0(tanh(g))
+
+#	partial_data = ((eta0,),)  # almost no data 
+#
+#	return get_fields2(partial_data), partial_data
 
 end 
 
-function fields2(((eta,),)::Tuple{Tuple{AbstractVector}} # incomplete data 
-								 )::Tuple{AbstractVector{ComplexF64},
-													AbstractVector{ComplexF64},
-													}
-	(eta, conj(eta))
 
-end 
+function eval_fields4((f0,f1,), g::Real, gx::Real, gy::Real=0, gz::Real=0)
 
-
-function eval_fields((f0, )::NTuple{1,Function}, 
-										 g::Real, grad::Vararg{<:Real}
-										 )::Tuple 
-
-	eta0 = f0(tanh(g))
-
-	partial_data = ((eta0,),)  # almost no data 
-
-	return fields2(partial_data), partial_data
-
-end 
-
-
-function eval_fields((f0, f1)::NTuple{2,Function}, 
-										 g::Real, gx::Real, gy::Real=0, gz::Real=0,
-										 )::Tuple 
+#	eval_fields(etas[1:2], g...)[1]
+#
+#end 
+#
+#
+#function eval_fields((f0, f1)::NTuple{2,Function}, 
+#										 g::Real, gx::Real, gy::Real=0, gz::Real=0,
+#										 )::Tuple 
 
 	t0 = tanh(g)
 
@@ -620,9 +630,11 @@ function eval_fields((f0, f1)::NTuple{2,Function},
 	
 	D = transpose(eta1) .* grad  	# size(D)==(3,2)
 
-	partial_data = ((eta0,eta1), D, grad)  # incomplete data 
+	return 	(eta0, conj(eta0), D, conj(D)) 
 
-	return fields4(partial_data),partial_data
+	#partial_data = ((eta0,eta1), D, grad)  # incomplete data 
+
+	#return get_fields4(partial_data)#,partial_data
 
 end 
 
@@ -674,11 +686,16 @@ function eval_fields((f0, f1, f2, f3)::Tuple{Function,
 	
 	grad = [gx,gy,gz]
 
-	full_data = ((eta0,eta1,eta2,eta3), transpose(eta1) .* grad, grad)
+	D = transpose(eta1) .* grad 
+	
+	return (
+					(eta0, conj(eta0), D, conj(D)),
+					((eta0,eta1,eta2,eta3), D, grad)
+					)
 
 
 
-	return fields4(full_data), full_data
+#	return get_fields4(full_data), full_data
 
 end  
 
@@ -752,22 +769,21 @@ function eval_deriv1_on_mvd(data, mvd::AbstractArray{Float64,N1},
 														steps::Vararg{Real,N}
 														)::Array{Float64,N+1} where {N,N1}
 
-	@assert N1==N+1 && N in 1:2
+	D = CentralDiff.init_array_fct_on_mvd(1, mvd, steps...)
 
-	A = CentralDiff.eval_fct_on_mvd(data, eval_free_en_deriv1, mvd, 
-																	(N+1,), steps...)
+	eval_deriv1_on_mvd!(D, data, mvd, steps...)
 
-	for (a,w) in zip(CentralDiff.mvd_container(A), 
-									 CentralDiff.central_diff_w(steps...))
-
-		a .*= w
-
-	end 
-
-	return A 
+	return D
 
 end  
 
+function eval_deriv1_on_mvd!(D::AbstractArray{Float64,N1},
+														 data, mvd::AbstractArray{Float64,N1}, 
+														steps::Vararg{Real,N}
+														)::Nothing where {N,N1}
+
+	CentralDiff.eval_deriv_on_mvd!(D, data, eval_free_en_deriv1!, mvd, steps...) 
+end 
 
 #===========================================================================#
 #
@@ -781,44 +797,23 @@ function eval_deriv2_on_mvd(
 														 steps::Vararg{Real,N}
 														 )::Array{ComplexF64,N+2} where {N,N1}
 
-	@assert N1==N+1 && N in 1:2 
+	D = CentralDiff.init_array_fct_on_mvd(ComplexF64, 2, mvd, steps...)
+	
+	eval_deriv2_on_mvd!(D, data, mvd, steps...)
 
-	A = zeros(ComplexF64, N+1, N+1, size(mvd)[2:end]...)
+	@assert isreal(D)
 
-	eval_deriv2_on_mvd!(A, data, mvd, steps...)
-
-	@assert isreal(A) 
-
-	return A
+	return D
 
 end 
 
-function eval_deriv2_on_mvd!(A::AbstractArray{ComplexF64,N2},
+function eval_deriv2_on_mvd!(D::AbstractArray{ComplexF64,N2},
 														 data, mvd::AbstractArray{Float64,N1},
 														 steps::Vararg{Real,N}
 														 )::Nothing where {N,N1,N2}
 
-	@assert N1==N+1 && N2==N+2 && N in 1:2 
 
-	A .= 0.0
-
-	w = CentralDiff.central_diff_w(steps...)  
-
-	CentralDiff.eval_fct_on_mvd!(A, data, eval_free_en_deriv2!, mvd, 
-																	(N+1,N+1), steps...)
-
-	for j=1:N+1
-		
-		A[:,j,:,:] .*= w[j] 
-	
-		A[j,:,:,:] .*= w[j]
-
-	end 
-
-	@assert isreal(A) 
-
-	return  
-
+	CentralDiff.eval_deriv_on_mvd!(D, data, eval_free_en_deriv2!, mvd, steps...) 
 end  
 
 
@@ -997,7 +992,7 @@ function rNJ!(g::AbstractVecOrMat,
 						 verbose::Bool=false,
 						 )::Tuple{Bool,Vector{Array}}
 
-	out = Vector{Array}([Array{Float64}(undef,d...,
+	out = Vector{Array}([Array{ComplexF64}(undef,d...,
 																			div(maxiter,10)) for (f,d) in fs])
 
 	
@@ -1069,24 +1064,92 @@ end
 
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+function eval_fields2_on_mvd!(out::AbstractMatrix, 
+															(etas, ),
+								 MVD::AbstractArray, mesh...)::Nothing
+
+	for i=CartesianIndices(axes(out,2))
+
+		out[:,i] = eval_fields2(etas, CentralDiff.mvd_container(MVD, i)...)
+
+	end 
+
+	return 
+	
+end 
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+Dependencies = [Lattice, Hamiltonian] 
+
+
+function Compute(dev_params::UODict;
+								 get_fname::Function,
+								 )::Dict
+		
+	Data = pack_data(dev_params)
+
+	xlim = Helpers.Lattices.selectMainDim(Lattice.PosAtoms(dev_params))
+	
+
+	proposed_gofx = Hamiltonian.dist_to_dw(dev_params, Hamiltonian.domain_wall_len(dev_params))
+
+	
+	nx = 100
+
+	x = LinRange(xlim..., nx) 
+
+	mesh = [step(x)]
+
+	relaxation = .3
+
+	g = proposed_gofx.(x) 
+
+
+	(success, (free_en, ys)) = rNJ!(g, Data, relaxation, mesh,
+
+																	 [(eval_free_en_on_mvd!,1),
+																		 (aux431!, (2,nx-1))
+																		];
+																	 verbose=true)
+			
+			
 
 
 
 
 
+end 
 
 
 
 
+function FoundFiles(dev_params::UODict;
+								 get_fname::Function 
+								 )::Bool
+
+end 
 
 
-
-
-
-
-
-
-
+function Read(dev_params::UODict;
+								 get_fname::Function 
+								 )::Dict
+end 
 
 
 

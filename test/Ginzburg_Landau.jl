@@ -1,11 +1,15 @@
-import myLibs: Utils 
+import myLibs: Utils, CentralDiff, Taylor, Algebra 
 import Device
-import Device: GL ,Hamiltonian, CentralDiff,Taylor,utils,algebra 
+import Device: GL, GL_old
+import Device: Hamiltonian
 import PyPlot,LinearAlgebra
 using Constants: VECTOR_STORE_DIM, MAIN_DIM
 import QuadGK ,Random,Combinatorics
 using LinearAlgebra: \,norm
-import NLsolve 
+import NLsolve  
+
+
+
 colors = ["brown","red","coral","peru","gold","olive","forestgreen","lightseagreen","dodgerblue","midnightblue","darkviolet","deeppink"] |> Random.shuffle
 println()
 
@@ -81,7 +85,7 @@ SCpy_magnitude = 0.1);
 
 function aux532(etas, args...)
 
-	function out(g_val::AbstractVector)
+function out(g_val::AbstractVector)
 
 		field_vals,field_data = GL.eval_fields(etas, g_val...)
 
@@ -115,11 +119,11 @@ end
 
 	for SCDW_shape in SCDW_shapes
 
-		break
+#		break
 
 		Random.seed!(Int(10round(time())))
 
-		(etas, (aux,fields), tensors) = Data = GL.get_Data(Utils.adapt_merge(P1,:SCDW_shape=>SCDW_shape)) 
+		(etas, (aux,fields), tensors) = Data = GL.pack_data(Utils.adapt_merge(P1,:SCDW_shape=>SCDW_shape)) 
 
 		for dim in [1,2,3]
 
@@ -168,7 +172,7 @@ end
 	
 						fstep_mu(dx) = setindex!(zero(g_val),dx,mu+1)
 	
-						@test utils.test_derivative(get_I, get_I_mu, g_val, fstep_mu)
+						@test CentralDiff.test_derivative(get_I, get_I_mu, g_val, fstep_mu)
 	
 						for nu=0:dim 
 	
@@ -178,7 +182,7 @@ end
 						
 							fstep_nu(dx) = setindex!(zero(g_val),dx,nu+1)
 	
-							@test utils.test_derivative(get_I_mu, get_I_mu_nu, g_val, fstep_nu)
+							@test CentralDiff.test_derivative(get_I_mu, get_I_mu_nu, g_val, fstep_nu)
 	
 	
 	
@@ -200,11 +204,11 @@ end
 
 	for SCDW_shape in SCDW_shapes
 
-		break 
+#		break 
 
 		Random.seed!(Int(10round(time())))
 
-		Data = GL.get_Data(Utils.adapt_merge(P1,:SCDW_shape=>SCDW_shape)) 
+		Data = GL.pack_data(Utils.adapt_merge(P1,:SCDW_shape=>SCDW_shape)) 
 
 		for dim in [1,2,3]
 
@@ -251,7 +255,7 @@ end
 
 				@test dfi(g_val)≈GL.eval_free_en_deriv1(Data, g_val...)[i]
 
-				@test utils.test_derivative(f, dfi, g_val, i) 
+				@test CentralDiff.test_derivative(f, dfi, g_val, i) 
 
 
 				for j=1:dim 
@@ -260,7 +264,7 @@ end
 
 					@test dfij(g_val) ≈GL.eval_free_en_deriv2(Data, g_val...)[i,j]
 
-					@test utils.test_derivative(dfi, dfij, g_val, j)
+					@test CentralDiff.test_derivative(dfi, dfij, g_val, j)
 
 				end 
 
@@ -287,13 +291,13 @@ end
 
 
 	for SCDW_shape in SCDW_shapes
-		break 
+#		break 
 
 		Random.seed!(Int(round(time())))
 
 		P = Utils.adapt_merge(P1,:SCDW_shape=>SCDW_shape)
 
-		Data = GL.get_Data(P)
+		Data = GL.pack_data(P)
 
 		nx = rand(20:50)
 
@@ -322,7 +326,7 @@ end
 			g = hcat((g0 for i=1:ny)...)
 	
 		
-			mvd1  = GL.m_dx_dy(g, h, s); 
+			mvd1  = GL_old.m_dx_dy(g, h, s); 
 			mvd2 = CentralDiff.midval_and_deriv(g, h, s) 
 		
 	
@@ -369,9 +373,9 @@ end
 
 			a,b,c = CentralDiff.mvd_container(mvd2)
 	
-			dF_1 = GL.M_X_Y(a,b,c, h,s,GL.eval_free_en_deriv1,Data)  
+			dF_1 = GL_old.M_X_Y(a,b,c, h,s,GL.eval_free_en_deriv1,Data)  
 			
-			dF_2 = GL.M_X_Y(mvd2, h,s,GL.eval_free_en_deriv1,Data)  
+			dF_2 = GL_old.M_X_Y(mvd2, h,s,GL.eval_free_en_deriv1,Data)  
 	
 	
 	
@@ -431,15 +435,15 @@ end
 	
 		
 	
-			dAdg1 = GL.dAdg(eachslice(dF_1, dims=3)...,h,s); 
+#			dAdg1 = GL_old.dAdg(eachslice(dF_1, dims=3)...,h,s); 
 		
-			dAdg2 = GL.dAdg(dF_1, h, s); 
+#			dAdg2 = GL_old.dAdg(dF_1, h, s); 
 	
-			@test dAdg1≈dAdg2  
+#			@test dAdg1≈dAdg2  
 			
 			dAdg5 = CentralDiff.collect_midval_deriv_1D(dF_4, h, s)
 	
-			@test dAdg2≈dAdg5 
+#			@test dAdg2≈dAdg5 
 	
 			
 	
@@ -474,47 +478,47 @@ end
 	
 	
 		
-			d2F = GL.M_X_Y_2(a,b,c,h,s,Data)
+#			d2F = GL_old.M_X_Y_2(a,b,c,h,s,Data)
 			
-			@test d2F ≈  GL.M_X_Y_2(mvd2,h,s,Data)
+			#@test d2F ≈  GL_old.M_X_Y_2(mvd2,h,s,Data)
 	
 	
-			d2F_2 = zeros(ComplexF64, size(d2F))
+#			d2F_2 = zeros(ComplexF64, size(d2F))
 		
-			@test !(d2F_2 ≈ d2F)
+#			@test !(d2F_2 ≈ d2F)
 	
-			GL.eval_deriv2_on_mvd!(d2F_2, Data, mvd2, h, s) 
+#			GL.eval_deriv2_on_mvd!(d2F_2, Data, mvd2, h, s) 
 	
-			@test d2F≈d2F_2 
+#			@test d2F≈d2F_2 
 
-			if !(d2F≈d2F_2)
-
-				@show size(d2F)  norm(d2F-d2F_2)
-		
-
-
-
-				for trials=1:10 
-					i = rand(CartesianIndices(d2F))
-					
-					@show d2F[i]≈d2F_2[i] && continue 
-
-					@show i 
-
-					@show d2F[i] d2F_2[i] 
-
-
-					println()
-				end  
-
-				error()
-
-			
-
-			end 
-			
-			
-			
+#			if !(d2F≈d2F_2)
+#
+#				@show size(d2F)  norm(d2F-d2F_2)
+#		
+#
+#
+#
+#				for trials=1:10 
+#					i = rand(CartesianIndices(d2F))
+#					
+#					@show d2F[i]≈d2F_2[i] && continue 
+#
+#					@show i 
+#
+#					@show d2F[i] d2F_2[i] 
+#
+#
+#					println()
+#				end  
+#
+#				error()
+#
+#			
+#
+#			end 
+#			
+#			
+#			
 			
 			d2f = GL.eval_deriv2_on_mvd(Data, mx_, h)
 	
@@ -587,19 +591,19 @@ end
 
 
 	
-			A3,a,J = GL.dAdg_(a,b,c, h, s,Data);
+#			A3,a,J = GL_old.dAdg_(a,b,c, h, s,Data);
 			
-			@test A3≈A1 
+#			@test A3≈A1 
 			
-			@test size(J)==(nx*ny,nx*ny) 
+#			@test size(J)==(nx*ny,nx*ny) 
 			
-			@test size(a)==(nx*ny,)
+#			@test size(a)==(nx*ny,)
 		
 	
-			@test dAdg1[:]≈a
+#			@test dAdg1[:]≈a
 
 			
-			@test d2A_2≈J
+#			@test d2A_2≈J
 	
 	
 	
@@ -617,9 +621,11 @@ end
 
 	for SCDW_shape in SCDW_shapes
 
+		break 
+
 		P = Utils.adapt_merge(P1,:SCDW_shape=>SCDW_shape)
 
-		Data = GL.get_Data(P)
+		Data = GL.pack_data(P)
 
 		eta0 = Hamiltonian.eta(P)
 

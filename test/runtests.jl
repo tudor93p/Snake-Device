@@ -11,7 +11,6 @@ foreach(pr_in, [
 
 #"gf",
 
-#"taylor", 
 
 #"GL_correct-D4h-dens",
 
