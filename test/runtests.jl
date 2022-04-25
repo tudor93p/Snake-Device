@@ -7,14 +7,12 @@ import Device
 
 foreach(pr_in, [
 
-#"h",
+"h",
 
 #"gf",
 
 
 #"GL_correct-D4h-dens",
-
-"Ginzburg_Landau"
 
 #"plot",
 
