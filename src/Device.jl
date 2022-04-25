@@ -21,7 +21,6 @@ export Hamiltonian
 
 
 
-
 #===========================================================================#
 #
 #
@@ -31,7 +30,6 @@ export Hamiltonian
 
 
 #include("GinzburgLandau_draft.jl")
-#include("GinzburgLandau.jl")
 
 include("Hamilt_Diagonaliz.jl") 
 
