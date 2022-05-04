@@ -218,9 +218,9 @@ uuid = "1f15a43c-97ca-5a2a-ae31-89f07a497df4"
 version = "0.11.2"
 
 [[DataAPI]]
-git-tree-sha1 = "cc70b17275652eb47bc9e5f81635981f13cea5c8"
+git-tree-sha1 = "fb5f5316dd3fd4c5e7c30a24d50643b73e37cd40"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
-version = "1.9.0"
+version = "1.10.0"
 
 [[DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -261,9 +261,9 @@ version = "1.0.3"
 
 [[DiffRules]]
 deps = ["IrrationalConstants", "LogExpFunctions", "NaNMath", "Random", "SpecialFunctions"]
-git-tree-sha1 = "dd933c4ef7b4c270aacd4eb88fa64c147492acf0"
+git-tree-sha1 = "28d605d9a0ac17118fe2c5e9ce0fbb76c3ceb120"
 uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
-version = "1.10.0"
+version = "1.11.0"
 
 [[Distances]]
 deps = ["LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI"]
@@ -339,9 +339,9 @@ version = "0.3.1"
 
 [[FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
-git-tree-sha1 = "80ced645013a5dbdc52cf70329399c35ce007fae"
+git-tree-sha1 = "9267e5f50b0e12fdfd5a2455534345c4cf2c7f7a"
 uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
-version = "1.13.0"
+version = "1.14.0"
 
 [[FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
@@ -378,9 +378,9 @@ version = "0.4.2"
 
 [[ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "LinearAlgebra", "LogExpFunctions", "NaNMath", "Preferences", "Printf", "Random", "SpecialFunctions", "StaticArrays"]
-git-tree-sha1 = "40d1546a45abd63490569695a86a2d93c2021e54"
+git-tree-sha1 = "34e6147e7686a101c245f12dba43b743c7afda96"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
-version = "0.10.26"
+version = "0.10.27"
 
 [[FreeType2_jll]]
 deps = ["Artifacts", "Bzip2_jll", "JLLWrappers", "Libdl", "Pkg", "Zlib_jll"]
@@ -493,7 +493,7 @@ version = "2.8.1+1"
 
 [[Helpers]]
 deps = ["Constants", "Distributed", "LinearAlgebra", "OrderedCollections", "PyCall", "PyPlot", "Revise", "Test", "myLibs"]
-git-tree-sha1 = "9c808e754302d583c9d1373f482aa99de42f9907"
+git-tree-sha1 = "292b181a282fc24dfa619d736209626e4c4b4b0e"
 repo-rev = "main"
 repo-url = "../../Helpers"
 uuid = "fd2d3303-ab2f-4175-b0e0-24add640a121"
@@ -636,9 +636,9 @@ version = "1.3.0"
 
 [[Latexify]]
 deps = ["Formatting", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "Printf", "Requires"]
-git-tree-sha1 = "6f14549f7760d84b2db7a9b10b88cd3cc3025730"
+git-tree-sha1 = "46a39b9c58749eefb5f2dc1178cb8fab5332b1ab"
 uuid = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
-version = "0.15.14"
+version = "0.15.15"
 
 [[LazyArtifacts]]
 deps = ["Artifacts", "Pkg"]
@@ -729,9 +729,9 @@ version = "2.12.0+0"
 
 [[LogExpFunctions]]
 deps = ["ChainRulesCore", "ChangesOfVariables", "DocStringExtensions", "InverseFunctions", "IrrationalConstants", "LinearAlgebra"]
-git-tree-sha1 = "a970d55c2ad8084ca317a4658ba6ce99b7523571"
+git-tree-sha1 = "76c987446e8d555677f064aaac1145c4c17662f8"
 uuid = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
-version = "0.3.12"
+version = "0.3.14"
 
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
@@ -908,9 +908,9 @@ version = "0.12.3"
 
 [[Parsers]]
 deps = ["Dates"]
-git-tree-sha1 = "3b429f37de37f1fc603cc1de4a799dc7fbe4c0b6"
+git-tree-sha1 = "1285416549ccfcdf0c50d4997a94331e88d68413"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.3.0"
+version = "2.3.1"
 
 [[Pixman_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -936,9 +936,9 @@ version = "1.2.0"
 
 [[Plots]]
 deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "GeometryBasics", "JSON", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "Requires", "Scratch", "Showoff", "SparseArrays", "Statistics", "StatsBase", "UUIDs", "UnicodeFun", "Unzip"]
-git-tree-sha1 = "6f2dd1cf7a4bbf4f305a0d8750e351cb46dfbe80"
+git-tree-sha1 = "d05baca9ec540de3d8b12ef660c7353aae9f9477"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-version = "1.27.6"
+version = "1.28.1"
 
 [[Polyhedra]]
 deps = ["GenericLinearAlgebra", "GeometryBasics", "JuMP", "LinearAlgebra", "MutableArithmetics", "RecipesBase", "SparseArrays", "StaticArrays"]
@@ -1126,9 +1126,9 @@ version = "2.1.4"
 
 [[Static]]
 deps = ["IfElse"]
-git-tree-sha1 = "87e9954dfa33fd145694e42337bdd3d5b07021a6"
+git-tree-sha1 = "91181e5820a400d1171db4382aa36e7fd19bee27"
 uuid = "aedffcd0-7271-4cad-89d0-dc628f76c6d3"
-version = "0.6.0"
+version = "0.6.3"
 
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
@@ -1154,9 +1154,9 @@ version = "0.33.16"
 
 [[StructArrays]]
 deps = ["Adapt", "DataAPI", "StaticArrays", "Tables"]
-git-tree-sha1 = "57617b34fa34f91d536eb265df67c2d4519b8b98"
+git-tree-sha1 = "8f705dd141733d79aa2932143af6c6e0b6cea8df"
 uuid = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
-version = "0.6.5"
+version = "0.6.6"
 
 [[TOML]]
 deps = ["Dates"]
@@ -1449,7 +1449,7 @@ version = "1.3.7+1"
 
 [[myLibs]]
 deps = ["Arpack", "CGAL", "Combinatorics", "ConcaveHull", "Dates", "DelimitedFiles", "Dierckx", "Distributed", "FFTW", "FileIO", "GeometryBasics", "Graphs", "JLD", "LinearAlgebra", "MetaGraphs", "Optim", "OrderedCollections", "Plots", "PolynomialRoots", "PyCall", "PyPlot", "QHull", "QuadGK", "Random", "Revise", "SparseArrays", "Test", "TikzGraphs", "TikzPictures"]
-git-tree-sha1 = "0eae120de71e9a1eeadeaa71bcde704b338bd61b"
+git-tree-sha1 = "2d0a9ffa416071d767241fe9485cf3fb52c01a27"
 repo-rev = "main"
 repo-url = "git@github.com:tudor93p/myLibs.git"
 uuid = "0cc41259-d48e-4a81-8a6d-ec7e330e4bca"
@@ -1457,7 +1457,7 @@ version = "0.1.1"
 
 [[myPlots]]
 deps = ["Constants", "FFTW", "LinearAlgebra", "OrderedCollections", "PyCall", "Revise", "Test", "myLibs"]
-git-tree-sha1 = "752ee9b685435cbd3144b2b550a85e9a622ade1a"
+git-tree-sha1 = "651a01982fddd5de7b020006a1c670a1c7f0cc96"
 repo-rev = "main"
 repo-url = "../../myPlots"
 uuid = "ab28f933-13dd-4a82-b110-d2be63b453ac"
