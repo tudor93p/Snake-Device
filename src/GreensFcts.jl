@@ -37,16 +37,32 @@ get_target = Helpers.ObservableNames.f_get_target(:observables)
 function Compute(dev_params::UODict; get_fname::Function, kwargs...
 								)::Dict
 
+	@warn "Check methods Device.GreensFcts -> Helpers.GF" 
+
+	@warn "ENERGIES not appropriate for all gap sizes"
+
 	Hopping = Hamiltonian.get_Hopping(dev_params)
+
+	atoms = LayeredLattice.PosAtoms(dev_params)
+
+
+	runinfo=Dict(	:parallel=>nworkers()>1,
+							 	:mem_cleanup=>nworkers()>1,
+								:verbose=>true,
+								)
+
+	isempty(kwargs) || @show kwargs
+
 
 	return Helpers.GF.ComputeObservables_Decimation(
 						 get_target(; kwargs...),
 						 get_fname(dev_params),
-						 Hopping,
+						 Hopping, atoms,
 						 LayeredLattice.NewGeometry(dev_params; Hopping...)...;
-#						 Lattice_fname=Lattice_fname,
-#						 plot_graphs=false,
+
 						 delta=dev_params[:delta],
+						 runinfo=runinfo,
+#							Energies=get_Energies(p_dev),
 						 kwargs...
 						 )
 						
