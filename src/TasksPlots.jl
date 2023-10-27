@@ -13,7 +13,7 @@ using myPlots: PlotTask
 
 import Helpers 
 
-using Constants: ENERGIES, NR_KPOINTS, SECOND_DIM
+using Constants: ENERGIES, NR_KPOINTS, SECOND_DIM, VECTOR_STORE_DIM
 
 import ..Hamiltonian
 
@@ -80,7 +80,9 @@ function LocalObservables(init_dict::AbstractDict;
 	pt0 = Observables(init_dict; observables=observables, kwargs...)
 
 	return PlotTask(pt0, (:localobs, observables),
-									myPlots.TypicalPlots.localobs(pt0, LayeredLattice)...)
+									myPlots.TypicalPlots.localobs(pt0, LayeredLattice;
+																								default_lobs="QP-LocalDOS",
+																								vsdim=VECTOR_STORE_DIM)...)
 
 
 end
@@ -97,7 +99,7 @@ function LocalObservablesCut(init_dict::AbstractDict;
 
 	default_obs = myPlots.Sliders.pick_local(observables)[1] 
 
-	md,sd = myPlots.main_secondary_dimensions()
+	md,sd = Helpers.main_secondary_dimensions()
 
 	function plot(P)
 
