@@ -1,8 +1,11 @@
 using Revise, Test 
-using Constants: PATH_SNAKE 
-include("$PATH_SNAKE/input_file.jl")
-
+import Constants
 import Device 
+
+
+include(Constants.inputfile("D1"))
+
+
 
 
 foreach(pr_in, [
@@ -12,11 +15,11 @@ foreach(pr_in, [
 #"gf",
 
 
+#"plot",
 
-"plot",
+#"local-oper",
 
-
-
+"time-evol",
 
 ])
 

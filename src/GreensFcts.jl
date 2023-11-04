@@ -9,6 +9,7 @@ import Helpers
 
 import ..Hamiltonian, ..LayeredLattice
 
+using Distributed: nworkers
 
 #===========================================================================#
 #
@@ -37,9 +38,17 @@ get_target = Helpers.ObservableNames.f_get_target(:observables)
 function Compute(dev_params::UODict; get_fname::Function, kwargs...
 								)::Dict
 
+
+##############
+
 	@warn "Check methods Device.GreensFcts -> Helpers.GF" 
 
 	@warn "ENERGIES not appropriate for all gap sizes"
+
+	isempty(kwargs) || @show keys(kwargs) 
+
+############
+
 
 	Hopping = Hamiltonian.get_Hopping(dev_params)
 
@@ -51,7 +60,6 @@ function Compute(dev_params::UODict; get_fname::Function, kwargs...
 								:verbose=>true,
 								)
 
-	isempty(kwargs) || @show kwargs
 
 
 	return Helpers.GF.ComputeObservables_Decimation(
@@ -63,7 +71,7 @@ function Compute(dev_params::UODict; get_fname::Function, kwargs...
 						 delta=dev_params[:delta],
 						 runinfo=runinfo,
 #							Energies=get_Energies(p_dev),
-						 kwargs...
+#						 kwargs...
 						 )
 						
 end 

@@ -17,11 +17,11 @@ using Constants: ENERGIES, NR_KPOINTS, SECOND_DIM, VECTOR_STORE_DIM
 
 import ..Hamiltonian
 
-import ..LayeredLattice
+import ..LayeredLattice, ..Lattice 
 import ..GreensFcts
 import ..Hamilt_Diagonaliz
 #import ..AndreevEq
-
+import ..TimeEvol
 
 using ..Lattice.TasksPlots, ..LayeredLattice.TasksPlots
 using ..Hamiltonian.TasksPlots 
@@ -87,6 +87,10 @@ function LocalObservables(init_dict::AbstractDict;
 
 end
 
+
+
+
+
 #===========================================================================#
 #
 function LocalObservablesCut(init_dict::AbstractDict;
@@ -101,7 +105,7 @@ function LocalObservablesCut(init_dict::AbstractDict;
 
 	md,sd = Helpers.main_secondary_dimensions()
 
-	function plot(P)
+	function plot(P::AbstractDict)::Dict
 
 		@assert haskey(P, "Energy")
 
@@ -165,9 +169,35 @@ function Spectrum(init_dict::AbstractDict;
 	task = CompTask(Calculation(Hamilt_Diagonaliz, init_dict;
 															operators=setdiff(operators, ["Velocity"]),
 															kwargs...))
+
+	pyscript,pyplot = myPlots.TypicalPlots.oper(task; vsdim=VECTOR_STORE_DIM) 
+
 	return PlotTask(task, 
-									[(:oper, operators), (:enlim, [-4,4])],
-									myPlots.TypicalPlots.oper(task))
+									[(:oper, operators), (:enlim, [-2,2])],
+									pyscript,
+									Base.Fix2(delete!, "xlim") ∘ pyplot 
+									)
+
+
+end
+
+
+
+#===========================================================================#
+#
+function LocalOper(init_dict::AbstractDict;
+													operators::AbstractVector{<:AbstractString},
+													kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	pt0 = Spectrum(init_dict; operators=operators, kwargs...)
+
+	return PlotTask(pt0, (:localobs, operators),
+									myPlots.TypicalPlots.localobs(pt0, Lattice;
+																								default_lobs="QP-LocalDOS",
+																								vsdim=VECTOR_STORE_DIM)...)
+
 
 end
 
@@ -175,22 +205,60 @@ end
 
 
 
+#===========================================================================#
+#
+function PulseTimeEvol(init_dict::AbstractDict;
+													operators::AbstractVector{<:AbstractString},
+													kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	task = CompTask(Calculation(TimeEvol, init_dict;
+															operators=setdiff(operators, ["Velocity"]),
+															kwargs...))
+
+	return PlotTask(task, (:localobs, operators),
+									myPlots.TypicalPlots.localobs(task, Lattice;
+																								default_lobs="QP-LocalDOS",
+																								vsdim=VECTOR_STORE_DIM)...)
+
+
+end
 
 
 
 #===========================================================================#
 #
-#
+function PulseTimeEvolObs(init_dict::AbstractDict;
+										 operators::AbstractVector{<:AbstractString}, 
+										 kwargs...)::PlotTask
 #
 #---------------------------------------------------------------------------#
 
+	task = CompTask(Calculation(TimeEvol, init_dict; 
+															operators=operators, kwargs...))
+
+	pyscript, plot_ = myPlots.TypicalPlots.obs(task) 
+
+	
+	function plot(P::AbstractDict)::Dict 
+
+		out = plot_(P) 
+
+		out["ylabel"] = "Time" 
+
+		return out 
+
+	end 
 
 
+	return PlotTask(task, 
+									[(:obs, operators), (:enlim, [-100,100])],
+									pyscript,plot
+#									myPlots.TypicalPlots.obs(task),
+									)
 
-
-
-
-
+end
 
 
 

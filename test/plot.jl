@@ -23,7 +23,7 @@ D = init(Device, true)
 #end 
 
 
-PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, true)[1][1])
+#PF = Helpers.hParameters.ParamFlow(Device.GreensFcts, get_input_dict(Device, true)[1][1])
 
 #@show rand(Parameters.get_paramcombs(PF))[1]
 
@@ -33,8 +33,9 @@ tasks = D.([
 #						:Latt,
 #						:LocalObservables,
 #						:LocalObservablesCut,
-					:Observables,
+#					:Observables,
 						:Spectrum,
+						:LocalOper,
 						])
 
 #task = tasks[3]
