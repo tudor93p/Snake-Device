@@ -5,7 +5,7 @@ import LinearAlgebra
 
 import myPlots
 
-import myLibs: Utils, ComputeTasks, Algebra, Parameters
+import myLibs: Utils, ComputeTasks, Algebra, Parameters, Lattices
 
 using myLibs.ComputeTasks: CompTask  
 using Helpers.Calculations: Calculation  
@@ -34,6 +34,44 @@ using ..Hamiltonian.TasksPlots
 #
 #
 #---------------------------------------------------------------------------#
+
+
+#===========================================================================#
+#
+function LattBonds(init_dict::AbstractDict; kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	task = CompTask(Calculation(Lattice, init_dict; kwargs...))
+
+	expand(n::Int)::Vector{Int} = [n,-n]
+
+	function plot(P::AbstractDict)::Dict{String,Any}
+
+		atoms = Lattices.PosAtoms(task.get_data(P, mute=false, fromPlot=true))
+
+
+#        bonds=None,
+#        bondwidth=None,
+#        bondcolor=None,
+#        linewidth=2,
+#        atom_limit=1000,
+		
+
+		return Dict{String,Any}(
+														"bonds" => Helpers.Lattice.get_BondsRs(atoms),
+
+														"xy" => Lattices.VecsOnDim(atoms; dim=2), 
+        						
+														"atom_limit"=>10000,
+
+														)
+
+	end 
+
+	return PlotTask(task, "BondsAtoms", plot)
+
+end
 
 
 
